@@ -8,6 +8,7 @@ from beachos_api.identity import (
     FakeIdentityProvider,
     FakeKitchenAuthority,
     FakeOrderingAuthority,
+    FakePaymentAuthority,
     FakeVenueOpeningAuthority,
 )
 from beachos_api.packs.beachos.bar.application import BarService
@@ -30,6 +31,11 @@ from beachos_api.packs.beachos.ordering.application import OrderingService
 from beachos_api.packs.beachos.ordering.infrastructure import (
     PostgresOrderingUnitOfWorkFactory,
     UUIDIdentityGenerator,
+)
+from beachos_api.packs.beachos.payments.application import PaymentService
+from beachos_api.packs.beachos.payments.infrastructure import (
+    PostgresPaymentUnitOfWorkFactory,
+    UUIDPaymentIdentities,
 )
 from beachos_api.packs.beachos.venue_opening.application import VenueOpeningService
 from beachos_api.packs.beachos.venue_opening.domain import VenueOpeningPolicy
@@ -134,3 +140,16 @@ def billing_service() -> BillingService:
     if not connection_string:
         raise ConfigurationError("BEACHOS_DATABASE_URL is required")
     return BillingService(PostgresBillReader(connection_string))
+
+
+def payment_service() -> PaymentService:
+    connection_string = os.environ.get("BEACHOS_DATABASE_URL")
+    if not connection_string:
+        raise ConfigurationError("BEACHOS_DATABASE_URL is required")
+    identities = FakeIdentityProvider()
+    return PaymentService(
+        authority=FakePaymentAuthority(identities),
+        clock=SystemClock(),
+        identities=UUIDPaymentIdentities(),
+        units=PostgresPaymentUnitOfWorkFactory(connection_string),
+    )

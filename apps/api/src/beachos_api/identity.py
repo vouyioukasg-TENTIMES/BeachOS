@@ -33,6 +33,7 @@ class FakeIdentityProvider:
                 "MARK_BAR_TICKET_READY",
                 "MARK_KITCHEN_TICKET_READY",
                 "OPEN_VENUE",
+                "RECORD_PAYMENTS",
                 "SUBMIT_ORDER",
             }
         ),
@@ -114,6 +115,20 @@ class FakeOrderingAuthority:
             actor_id == identity.host_id
             and identity.has_venue_access
             and "SUBMIT_ORDER" in identity.capabilities
+        )
+
+
+class FakePaymentAuthority:
+    def __init__(self, identities: FakeIdentityProvider) -> None:
+        self._identities = identities
+
+    def can_record_payment(self, *, actor_id: str, customer_group_id: str) -> bool:
+        del customer_group_id
+        identity = self._identities.current()
+        return (
+            actor_id == identity.actor_id
+            and identity.has_venue_access
+            and "RECORD_PAYMENTS" in identity.capabilities
         )
 
 

@@ -37,7 +37,18 @@ class BillLineAdded:
     occurred_at: datetime
 
 
-BillingEvent = BillCreated | BillLineAdded
+@dataclass(frozen=True, slots=True)
+class PaymentRecorded:
+    payment_id: str
+    bill_id: str
+    amount: Decimal
+    currency: str
+    method: str
+    recorded_by_id: str
+    occurred_at: datetime
+
+
+BillingEvent = BillCreated | BillLineAdded | PaymentRecorded
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +71,7 @@ class Bill:
         self._customer_group_id: str | None = None
         self._currency: str | None = None
         self._lines: list[BillLine] = []
+        self._payments: list[PaymentRecorded] = []
         self._version = 0
 
     @classmethod
@@ -82,6 +94,13 @@ class Bill:
             return
         if self._bill_id is None or event.bill_id != self._bill_id:
             raise BillingError("Bill Line must belong to the restored Bill")
+        if isinstance(event, PaymentRecorded):
+            if event.currency.upper() != self._currency or event.amount <= 0:
+                raise BillingError("Payment must be positive and match the Bill currency")
+            if any(payment.payment_id == event.payment_id for payment in self._payments):
+                raise BillingError("Payment id must be unique")
+            self._payments.append(event)
+            return
         if event.currency.upper() != self._currency:
             raise BillingError("Bill Line currency must match the Bill")
         if event.quantity <= 0 or event.unit_price < 0 or event.amount < 0:
@@ -126,6 +145,14 @@ class Bill:
     @property
     def total(self) -> Decimal:
         return sum((line.amount for line in self._lines), Decimal("0"))
+
+    @property
+    def payments(self) -> tuple[PaymentRecorded, ...]:
+        return tuple(self._payments)
+
+    @property
+    def balance(self) -> Decimal:
+        return self.total - sum((payment.amount for payment in self._payments), Decimal("0"))
 
     @property
     def version(self) -> int:

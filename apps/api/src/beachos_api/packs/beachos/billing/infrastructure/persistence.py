@@ -7,7 +7,12 @@ from typing import Any
 import psycopg
 from psycopg.rows import dict_row
 
-from beachos_api.packs.beachos.billing.domain import Bill, BillCreated, BillLineAdded
+from beachos_api.packs.beachos.billing.domain import (
+    Bill,
+    BillCreated,
+    BillLineAdded,
+    PaymentRecorded,
+)
 
 
 class PostgresBillReader:
@@ -26,9 +31,29 @@ class PostgresBillReader:
                 """,
                 (customer_group_id,),
             ).fetchall()
+            payment_rows = connection.execute(
+                """SELECT event_data,occurred_at FROM payment_events
+                WHERE event_type='PAYMENT_RECORDED'
+                  AND event_data->>'customer_group_id'=%s ORDER BY sequence""",
+                (customer_group_id,),
+            ).fetchall()
         if not rows:
             return None
-        events = tuple(self._map(row) for row in rows)
+        events = (
+            *tuple(self._map(row) for row in rows),
+            *tuple(
+                PaymentRecorded(
+                    row["event_data"]["payment_id"],
+                    row["event_data"]["bill_id"],
+                    Decimal(row["event_data"]["amount"]),
+                    row["event_data"]["currency"],
+                    row["event_data"]["method"],
+                    row["event_data"]["recorded_by_id"],
+                    row["occurred_at"],
+                )
+                for row in payment_rows
+            ),
+        )
         return Bill.restore(events)
 
     @staticmethod

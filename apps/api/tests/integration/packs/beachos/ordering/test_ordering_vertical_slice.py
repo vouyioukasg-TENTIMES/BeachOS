@@ -12,8 +12,8 @@ from fastapi.testclient import TestClient
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from beachos_api.composition import billing_service, ordering_service
-from beachos_api.identity import FakeIdentityProvider, FakeOrderingAuthority
+from beachos_api.composition import billing_service, ordering_service, payment_service
+from beachos_api.identity import FakeIdentityProvider, FakeOrderingAuthority, FakePaymentAuthority
 from beachos_api.main import create_app
 from beachos_api.packs.beachos.billing.application import BillingService
 from beachos_api.packs.beachos.billing.infrastructure import PostgresBillReader
@@ -21,6 +21,11 @@ from beachos_api.packs.beachos.ordering.application import OrderingService
 from beachos_api.packs.beachos.ordering.infrastructure import (
     PostgresOrderingUnitOfWorkFactory,
     UUIDIdentityGenerator,
+)
+from beachos_api.packs.beachos.payments.application import PaymentService
+from beachos_api.packs.beachos.payments.infrastructure import (
+    PostgresPaymentUnitOfWorkFactory,
+    UUIDPaymentIdentities,
 )
 from beachos_api.packs.beachos.venue_opening.infrastructure import SystemClock, apply_migrations
 
@@ -82,6 +87,13 @@ def test_real_api_persists_and_restores_one_atomic_order_round(
     app.dependency_overrides[billing_service] = lambda: BillingService(
         PostgresBillReader(postgres_connection_string)
     )
+    identities = FakeIdentityProvider()
+    app.dependency_overrides[payment_service] = lambda: PaymentService(
+        authority=FakePaymentAuthority(identities),
+        clock=SystemClock(),
+        identities=UUIDPaymentIdentities(),
+        units=PostgresPaymentUnitOfWorkFactory(postgres_connection_string),
+    )
     client = TestClient(app)
     payload = {
         "request_id": "request-1",
@@ -108,11 +120,30 @@ def test_real_api_persists_and_restores_one_atomic_order_round(
     assert bill.json()["balance"] == "18.00"
     assert len(bill.json()["lines"]) == 2
 
+    payment_payload = {
+        "request_id": "payment-request-1",
+        "customer_group_id": "group-1",
+        "amount": "18.00",
+        "currency": "EUR",
+    }
+    payment = client.post("/payments/cash", json=payment_payload)
+    assert payment.status_code == 200
+    assert payment.json()["method"] == "CASH"
+    assert payment.json()["balance"] == "0"
+    assert client.post("/payments/cash", json=payment_payload).json() == payment.json()
+    paid_bill = client.get("/billing/customer-groups/group-1").json()
+    assert paid_bill["balance"] == "0.00"
+    assert paid_bill["status"] == "FULLY_PAID"
+    assert len(paid_bill["payments"]) == 1
+
     with psycopg.connect(postgres_connection_string) as connection:
         assert connection.execute("SELECT count(*) FROM ordering_events").fetchone()[0] == 8
         assert (
             connection.execute("SELECT count(*) FROM ordering_command_receipts").fetchone()[0] == 1
         )
+        assert connection.execute("SELECT count(*) FROM payment_events").fetchone()[0] == 2
+        assert connection.execute("SELECT count(*) FROM payment_activity_log").fetchone()[0] == 1
+        assert connection.execute("SELECT count(*) FROM ordering_events").fetchone()[0] == 8
 
 
 def test_transaction_rolls_back_without_commit(postgres_connection_string: str) -> None:

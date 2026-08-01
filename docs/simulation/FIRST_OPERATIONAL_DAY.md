@@ -531,8 +531,9 @@ approved Payment Method?
 **Current Facts:** The correct Bill and Balance must be known. Only confirmed
 receipt is a Payment. Role alone does not authorize recording it.
 
-**Operational Readiness:** Cannot be completed because Payment allocation and
-exception rules and the Payment capability are absent.
+**Operational Readiness:** The MVP is ready only when one open Bill has a
+positive confirmed Balance, the authorized person confirms receipt of that
+exact full amount in Cash, and no Payment has already been recorded.
 
 **Operational Confidence:** Must remain uncertain whenever receipt outcome is
 unknown. An attempt must never reduce Balance.
@@ -540,21 +541,19 @@ unknown. An attempt must never reduce Balance.
 **Attention:** Duplicate receipt risk, uncertain outcome, or rejected method
 requires immediate attention and reconciliation.
 
-**Advice:** State whether receipt was recorded, rejected, or remains uncertain.
-Do not claim success without confirmation.
+**Advice:** Record only confirmed receipt of the exact Balance. If the response
+is unknown, reload the Bill and retry with the same request identity rather than
+recording another Payment.
 
-**Business Events:** `Payment Recorded` after confirmed receipt; `Payment
-Rejected` after confirmed rejection; `Bill Fully Paid` if valid Payments reduce
-Balance to zero. `Payment Reversed` is Command gated.
+**Business Events:** `Payment Recorded` and `Bill Fully Paid` are appended
+atomically after confirmed receipt. `Payment Rejected` and `Payment Reversed`
+remain outside this MVP.
 
-**Capability Used:** None implemented.
+**Capability Used:** Payments and Billing.
 
-**Expected Outcome:** No safe Payment outcome can currently be recorded.
-
-> **MISSING CAPABILITY**
->
-> Payments are not implemented. Partial, split, excess, reversal, refund, cash
-> change, tip, and allocation rules also remain unresolved.
+**Expected Outcome:** One confirmed full Cash Payment reduces the Balance to
+zero exactly once, remains visible in Billing, preserves every Bill Line, and
+creates a permanent Activity Log.
 
 ## 14. Bill Closing and Customer Group Completion
 
@@ -707,7 +706,10 @@ The following working product slices exist in the repository:
 10. **Billing** — one event-restored running Bill explains the Beach Sunbed
     opening obligation and all approved Order Bill Lines; an explicit no-Bill
     state remains possible.
-11. **Operational Intelligence guidance** — approved principles define readiness,
+11. **Payments MVP** — an authorized person can record one confirmed full Cash
+    Payment; the Bill shows zero Balance and `FULLY_PAID` without closing or
+    completing the Customer Group.
+12. **Operational Intelligence guidance** — approved principles define readiness,
     confidence, attention, blockers, advice, and human decision boundaries.
 
 These are completed slices, not proof of complete operational coverage.
@@ -721,7 +723,8 @@ These are completed slices, not proof of complete operational coverage.
 4. Responsible Service Staff handover.
 5. Advanced fulfilment exceptions, including partial item or quantity handling,
    cancellation, remakes, substitutions, and returns.
-6. Payment recording and recovery.
+6. Payment exceptions beyond the MVP, including partial, split, excess,
+   multiple-method, reversal, refund, tips, and cash change.
 7. Bill correction and reversal governance.
 8. Bill Closing.
 9. Customer Group Completion, including the no-Bill path.
@@ -789,9 +792,9 @@ contradictions:
 5. The approved Service Operations architecture preserves separate Kitchen and
    Bar business ownership while allowing their confirmed mechanics to remain
    consistent.
-6. Billing now joins Beach Sunbed charges and Order obligations into one
-   explainable view. Payments, closing, and Customer Group completion remain
-   separate gaps.
+6. Billing now joins Beach Sunbed charges, Order obligations, and the confirmed
+   full Cash Payment into one explainable view. Closing and Customer Group
+   completion remain separate gaps.
 7. Temporary development identity allows vertical-slice testing but cannot
    establish production Operational Confidence about human authority.
 8. The next continuity break is Customer Group Transfer: destination, charging,
@@ -806,8 +809,8 @@ day**.
 
 The operational day now proceeds from Department Readiness through Venue
 Opening, Guest Arrival, Customer Group Opening, Ordering, complete basic
-whole-Ticket fulfilment through `READY`, `COLLECTED`, and `DELIVERED`, and
-authoritative Bill Review. It still cannot continue correctly through Customer
-Group Transfer, Payment, departure, or Venue closing. Expansion should preserve
-these gaps as explicit boundaries rather than bridge them with inferred
-behaviour.
+whole-Ticket fulfilment through `READY`, `COLLECTED`, and `DELIVERED`,
+authoritative Bill Review, and confirmed full Cash Payment. It still cannot
+continue correctly through Customer Group Transfer, Bill Closing, departure, or
+Venue closing. Expansion should preserve these gaps as explicit boundaries
+rather than bridge them with inferred behaviour.

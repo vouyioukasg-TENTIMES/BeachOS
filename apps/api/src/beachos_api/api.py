@@ -17,6 +17,7 @@ from beachos_api.composition import (
     guest_arrival_service,
     kitchen_service,
     ordering_service,
+    payment_service,
     venue_opening_service,
 )
 from beachos_api.identity import DevelopmentIdentity, development_identity
@@ -93,6 +94,17 @@ from beachos_api.packs.beachos.ordering.infrastructure.errors import (
     OrderingConcurrencyError,
     OrderingInfrastructureError,
 )
+from beachos_api.packs.beachos.payments.application import (
+    PaymentResult,
+    PaymentService,
+    RecordCashPaymentCommand,
+)
+from beachos_api.packs.beachos.payments.application.service import (
+    PaymentApplicationError,
+    PaymentAuthorizationError,
+    PaymentNotFoundError,
+)
+from beachos_api.packs.beachos.payments.infrastructure.persistence import PaymentConcurrencyError
 from beachos_api.packs.beachos.venue_opening.application import (
     DeclareDepartmentReadinessCommand,
     DeclareDepartmentReadinessResult,
@@ -421,6 +433,7 @@ Identity = Annotated[DevelopmentIdentity, Depends(development_identity)]
 VenueId = Annotated[str, Query(min_length=1)]
 OrderingServiceDependency = Annotated[OrderingService, Depends(ordering_service)]
 BillingServiceDependency = Annotated[BillingService, Depends(billing_service)]
+PaymentServiceDependency = Annotated[PaymentService, Depends(payment_service)]
 GuestArrivalServiceDependency = Annotated[GuestArrivalService, Depends(guest_arrival_service)]
 CustomerGroupId = Annotated[str, Query(min_length=1)]
 
@@ -863,6 +876,15 @@ class RunningBillLineResponse(BaseModel):
     occurred_at: datetime
 
 
+class PaymentSummaryResponse(BaseModel):
+    payment_id: str
+    amount: Decimal
+    currency: str
+    method: str
+    recorded_by_id: str
+    recorded_at: datetime
+
+
 class RunningBillResponse(BaseModel):
     bill_id: str
     customer_group_id: str
@@ -871,6 +893,7 @@ class RunningBillResponse(BaseModel):
     balance: Decimal
     status: str
     lines: tuple[RunningBillLineResponse, ...]
+    payments: tuple[PaymentSummaryResponse, ...]
     version: int
 
     @classmethod
@@ -895,8 +918,45 @@ class RunningBillResponse(BaseModel):
                 )
                 for line in bill.lines
             ),
+            payments=tuple(
+                PaymentSummaryResponse(
+                    payment_id=payment.payment_id,
+                    amount=payment.amount,
+                    currency=payment.currency,
+                    method=payment.method,
+                    recorded_by_id=payment.recorded_by_id,
+                    recorded_at=payment.recorded_at,
+                )
+                for payment in bill.payments
+            ),
             version=bill.version,
         )
+
+
+class RecordCashPaymentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    request_id: str = Field(min_length=1)
+    customer_group_id: str = Field(min_length=1)
+    amount: Decimal
+    currency: str = Field(min_length=1)
+
+
+class PaymentResponse(BaseModel):
+    request_id: str
+    payment_id: str
+    bill_id: str
+    customer_group_id: str
+    amount: Decimal
+    currency: str
+    method: str
+    recorded_by_id: str
+    recorded_at: datetime
+    balance: Decimal
+    bill_status: str
+
+    @classmethod
+    def from_application(cls, result: PaymentResult) -> PaymentResponse:
+        return cls(**{field: getattr(result, field) for field in cls.model_fields})
 
 
 @router.get(
@@ -910,6 +970,25 @@ def running_bill(
     del identity
     bill = service.get_bill(customer_group_id=customer_group_id)
     return RunningBillResponse.from_application(bill) if bill else None
+
+
+@router.post("/payments/cash", response_model=PaymentResponse)
+def record_cash_payment(
+    payload: RecordCashPaymentRequest,
+    service: PaymentServiceDependency,
+    identity: Identity,
+) -> PaymentResponse:
+    return PaymentResponse.from_application(
+        service.record_cash_payment(
+            RecordCashPaymentCommand(
+                payload.request_id,
+                identity.actor_id,
+                payload.customer_group_id,
+                payload.amount,
+                payload.currency,
+            )
+        )
+    )
 
 
 @router.post("/orders", response_model=SubmitOrderResponse)
@@ -1186,3 +1265,19 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(BarInfrastructureError)
     def bar_unavailable(_: Request, __: BarInfrastructureError) -> JSONResponse:
         return _error(503, "bar_unavailable", "Bar Operations is temporarily unavailable.")
+
+    @app.exception_handler(PaymentAuthorizationError)
+    def payment_denied(_: Request, error: PaymentAuthorizationError) -> JSONResponse:
+        return _error(403, "payment_forbidden", str(error))
+
+    @app.exception_handler(PaymentNotFoundError)
+    def payment_bill_missing(_: Request, error: PaymentNotFoundError) -> JSONResponse:
+        return _error(404, "bill_not_found", str(error))
+
+    @app.exception_handler(PaymentConcurrencyError)
+    def payment_conflict(_: Request, __: PaymentConcurrencyError) -> JSONResponse:
+        return _error(409, "payment_conflict", "Payment state changed. Reload the Bill.")
+
+    @app.exception_handler(PaymentApplicationError)
+    def payment_rejected(_: Request, error: PaymentApplicationError) -> JSONResponse:
+        return _error(409, "payment_rejected", str(error))

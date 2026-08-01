@@ -33,7 +33,18 @@ class BillDTO:
     balance: Decimal
     status: str
     lines: tuple[BillLineDTO, ...]
+    payments: tuple["PaymentDTO", ...]
     version: int
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentDTO:
+    payment_id: str
+    amount: Decimal
+    currency: str
+    method: str
+    recorded_by_id: str
+    recorded_at: datetime
 
 
 class BillingService:
@@ -49,8 +60,8 @@ class BillingService:
             bill.customer_group_id,
             bill.currency,
             bill.total,
-            bill.total,
-            "OPEN",
+            bill.balance,
+            "FULLY_PAID" if bill.balance == 0 else "OPEN",
             tuple(
                 BillLineDTO(
                     line.bill_line_id,
@@ -63,6 +74,17 @@ class BillingService:
                     line.occurred_at,
                 )
                 for line in bill.lines
+            ),
+            tuple(
+                PaymentDTO(
+                    payment.payment_id,
+                    payment.amount,
+                    payment.currency,
+                    payment.method,
+                    payment.recorded_by_id,
+                    payment.occurred_at,
+                )
+                for payment in bill.payments
             ),
             bill.version,
         )
