@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "beachos-api"
+version = "0.0.0"
+description = "Backend application for the BeachOS Platform"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "fastapi>=0.129,<0.130",
+  "psycopg[binary]==3.3.4",
+  "uvicorn[standard]>=0.34,<0.35",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<0.29",
+  "mypy>=1.15,<2",
+  "pytest>=8.3,<9",
+  "pytest-cov>=6,<7",
+  "ruff>=0.11,<0.12",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/beachos_api"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["A", "B", "E", "F", "I", "N", "RUF", "S", "SIM", "UP"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unreachable = true
+pretty = true
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers --cov=beachos_api --cov-report=term-missing --cov-fail-under=100"
+markers = [
+  "integration: requires an isolated PostgreSQL 17 test database",
+]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["beachos_api"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

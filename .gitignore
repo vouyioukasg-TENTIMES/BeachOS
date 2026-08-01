@@ -1,0 +1,62 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# JavaScript and TypeScript
+node_modules/
+.pnpm-store/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.vite/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.python-version
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Tests and browser tools
+test-results/
+playwright-report/
+blob-report/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+*.tmp
+
+# Infrastructure and local data
+.terraform/
+*.tfstate
+*.tfstate.*
+infrastructure/data/
+docker-compose.override.yml
+
+# Build and tool caches
+.cache/
+.turbo/

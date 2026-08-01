@@ -1,0 +1,1 @@
+"""BeachOS backend application."""

@@ -1,0 +1,1 @@
+"""Kitchen Operations feature pack."""
