@@ -62,6 +62,17 @@ class PostgresCustomerGroupRepository:
             event_from_data(event["event_type"], event["event_data"], event["occurred_at"])
             for event in event_rows
         )
+        closed_row = self._connection.execute(
+            """SELECT EXISTS(
+                    SELECT 1 FROM payment_events
+                    WHERE event_type='BILL_CLOSED'
+                      AND event_data->>'customer_group_id'=%s
+                ) AS closed""",
+            (customer_group_id,),
+        ).fetchone()
+        if closed_row is None:
+            raise OrderingConcurrencyError("Bill closing state is unavailable")
+        bill_closed = closed_row["closed"]
         group = CustomerGroup.restore(
             customer_group_id=row["customer_group_id"],
             venue_id=row["venue_id"],
@@ -69,6 +80,7 @@ class PostgresCustomerGroupRepository:
             responsible_waiter_id=row["responsible_waiter_id"],
             status=CustomerGroupStatus(row["status"]),
             events=events,
+            bill_closed=bill_closed,
         )
         if group.version != row["stream_version"]:
             raise OrderingConcurrencyError("Ordering event stream version is inconsistent")

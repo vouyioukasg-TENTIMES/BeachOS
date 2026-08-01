@@ -34,6 +34,8 @@ class BillDTO:
     status: str
     lines: tuple[BillLineDTO, ...]
     payments: tuple["PaymentDTO", ...]
+    closed_by_id: str | None
+    closed_at: datetime | None
     version: int
 
 
@@ -61,7 +63,7 @@ class BillingService:
             bill.currency,
             bill.total,
             bill.balance,
-            "FULLY_PAID" if bill.balance == 0 else "OPEN",
+            "CLOSED" if bill.closed else "FULLY_PAID" if bill.balance == 0 else "OPEN",
             tuple(
                 BillLineDTO(
                     line.bill_line_id,
@@ -86,5 +88,7 @@ class BillingService:
                 )
                 for payment in bill.payments
             ),
+            bill.closed.closed_by_id if bill.closed else None,
+            bill.closed.occurred_at if bill.closed else None,
             bill.version,
         )

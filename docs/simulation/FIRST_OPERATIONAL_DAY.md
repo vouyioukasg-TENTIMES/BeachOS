@@ -564,36 +564,40 @@ creates a permanent Activity Log.
 **Business Decision:** Can the Bill be closed and can the Active Customer Group
 be completed without losing financial or operational truth?
 
-**Current Facts:** Full Payment, zero Balance, and Bill closing do not
-automatically complete the Customer Group. Bill closing and Customer Group
-completion are distinct facts unless a later decision defines their sequence.
+**Current Facts:** The Bill is `FULLY_PAID`. An authorized close action creates
+one immutable `Bill Closed` event. Closing does not modify Bill Lines or
+Payments. The Customer Group remains `ACTIVE` and the Service Location remains
+occupied.
 
-**Operational Readiness:** Unknown because exact closing and completion
-conditions, authority, no-Bill path, and outstanding-work requirements are
+**Operational Readiness:** Bill Closing is ready only for an existing
+`FULLY_PAID` Bill that is not already closed. Customer Group Completion remains
+unready because its authority, no-Bill path, and outstanding-work conditions are
 unresolved.
 
-**Operational Confidence:** Insufficient. BeachOS must not infer completion from
-Payment or physical departure.
+**Operational Confidence:** High for the confirmed Bill status and immutable
+closing event. Insufficient for Customer Group Completion or departure, which
+must not be inferred from Payment or Bill Closing.
 
 **Attention:** A zero Balance with unresolved operational work, an Active group
 after departure, or an attempted ordinary action after completion requires
 attention.
 
-**Advice:** Do not close or complete automatically. Preserve the Active state and
-current facts until the Product Owner approves the workflow.
+**Advice:** Close only through the intentional authorized action. After closing,
+keep the Bill read-only and clearly state that service remains active and the
+location remains occupied.
 
-**Business Events:** `Bill Closed` and `Customer Group Completed` are recognized
-but Command gated.
+**Business Events:** `Bill Closed`. `Customer Group Completed` remains Command
+gated and is not produced.
 
-**Capability Used:** None implemented.
+**Capability Used:** Bill Closing and Billing.
 
-**Expected Outcome:** The business day cannot reach a valid final Customer Group
-state.
+**Expected Outcome:** The fully paid Bill becomes read-only exactly once while
+the Customer Group and Service Location remain operationally unchanged.
 
 > **MISSING CAPABILITY**
 >
-> Bill Closing and Customer Group Completion are not ready for capability design
-> because their core Product Owner decisions remain open.
+> Customer Group Completion remains unavailable. Bill Closing does not resolve
+> completion, departure, or Service Location release.
 
 ## 15. Guests Depart and the Service Location Is Released
 
@@ -709,7 +713,10 @@ The following working product slices exist in the repository:
 11. **Payments MVP** — an authorized person can record one confirmed full Cash
     Payment; the Bill shows zero Balance and `FULLY_PAID` without closing or
     completing the Customer Group.
-12. **Operational Intelligence guidance** — approved principles define readiness,
+12. **Bill Closing MVP** — an authorized person can close one `FULLY_PAID` Bill;
+    financial history becomes read-only while the Customer Group remains
+    `ACTIVE` and its Service Location remains occupied.
+13. **Operational Intelligence guidance** — approved principles define readiness,
     confidence, attention, blockers, advice, and human decision boundaries.
 
 These are completed slices, not proof of complete operational coverage.
@@ -726,10 +733,9 @@ These are completed slices, not proof of complete operational coverage.
 6. Payment exceptions beyond the MVP, including partial, split, excess,
    multiple-method, reversal, refund, tips, and cash change.
 7. Bill correction and reversal governance.
-8. Bill Closing.
-9. Customer Group Completion, including the no-Bill path.
-10. Guest Departure and Service Location operational release.
-11. Venue Closing for the Business Date.
+8. Customer Group Completion, including the no-Bill path.
+9. Guest Departure and Service Location operational release.
+10. Venue Closing for the Business Date.
 
 ## Contradictions Found
 
@@ -765,15 +771,14 @@ contradictions:
    and replacement lines combined?
 7. How do partial, split, excess, reversed, and refunded Payments work, including
    cash change, tips, and allocation?
-8. What exact conditions allow a Bill to close, and who may close it?
-9. What exact conditions and authority complete a Customer Group?
-10. How does a Customer Group with no Bill complete?
-11. What is the approved sequence among physical departure, Bill closing,
+8. What exact conditions and authority complete a Customer Group?
+9. How does a Customer Group with no Bill complete?
+10. What is the approved sequence among physical departure, Bill closing,
     Customer Group completion, Service Location release, and any cleaning/reset
     requirement?
-12. What is the official Venue Closing Workflow, who owns it, and what permanent
+11. What is the official Venue Closing Workflow, who owns it, and what permanent
     closing record is required?
-13. What are the approved waiting, reservation, priority, capacity,
+12. What are the approved waiting, reservation, priority, capacity,
     accessibility, complaint, and incident rules needed for exceptional days?
 
 ## Architecture Observations
@@ -792,9 +797,9 @@ contradictions:
 5. The approved Service Operations architecture preserves separate Kitchen and
    Bar business ownership while allowing their confirmed mechanics to remain
    consistent.
-6. Billing now joins Beach Sunbed charges, Order obligations, and the confirmed
-   full Cash Payment into one explainable view. Closing and Customer Group
-   completion remain separate gaps.
+6. Billing now joins Beach Sunbed charges, Order obligations, the confirmed full
+   Cash Payment, and immutable Bill Closing into one explainable view. Customer
+   Group completion remains a separate gap.
 7. Temporary development identity allows vertical-slice testing but cannot
    establish production Operational Confidence about human authority.
 8. The next continuity break is Customer Group Transfer: destination, charging,
@@ -810,7 +815,7 @@ day**.
 The operational day now proceeds from Department Readiness through Venue
 Opening, Guest Arrival, Customer Group Opening, Ordering, complete basic
 whole-Ticket fulfilment through `READY`, `COLLECTED`, and `DELIVERED`,
-authoritative Bill Review, and confirmed full Cash Payment. It still cannot
-continue correctly through Customer Group Transfer, Bill Closing, departure, or
-Venue closing. Expansion should preserve these gaps as explicit boundaries
+authoritative Bill Review, confirmed full Cash Payment, and Bill Closing. It
+still cannot continue correctly through Customer Group Transfer, Customer Group
+Completion, departure, or Venue closing. Expansion should preserve these gaps as explicit boundaries
 rather than bridge them with inferred behaviour.

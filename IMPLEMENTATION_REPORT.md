@@ -1,24 +1,24 @@
-# Implementation Report — Payments MVP
+# Implementation Report — Bill Closing MVP
 
 ## 1. Executive Summary
 
-- **Objective:** Record one confirmed full Cash Payment against one Bill.
+- **Objective:** Close an already `FULLY_PAID` Bill without completing service.
 - **Status:** Complete, with PostgreSQL execution pending locally.
-- **Result:** The real vertical slice records Payment exactly once, emits
-  `Payment Recorded` and `Bill Fully Paid`, writes an Activity Log atomically,
-  and updates the Billing workspace Balance and status.
+- **Result:** An authorized close action appends one immutable `Bill Closed`
+  event. The closed Bill is read-only while its Customer Group remains `ACTIVE`
+  and its Service Location remains occupied.
 
 ## 2. Repository Tree
 
 ```text
-apps/api/src/beachos_api/packs/beachos/payments/
+apps/api/src/beachos_api/packs/beachos/bill_closing/
 ├── __init__.py
 ├── application/{__init__.py,service.py}
 ├── domain/{__init__.py,model.py}
 └── infrastructure/{__init__.py,persistence.py}
-apps/api/tests/unit/packs/beachos/payments/test_payments.py
+apps/api/tests/unit/packs/beachos/bill_closing/test_bill_closing.py
 apps/api/src/beachos_api/packs/beachos/venue_opening/infrastructure/persistence/
-└── migrations/0007_cash_payments.sql
+└── migrations/0008_bill_closing.sql
 apps/web/src/{BillingWorkspace.tsx,billingApi.ts,billingApi.test.ts}
 docs/simulation/FIRST_OPERATIONAL_DAY.md
 IMPLEMENTATION_REPORT.md
@@ -26,24 +26,26 @@ IMPLEMENTATION_REPORT.md
 
 ## 3. Files Created
 
-- Payments Domain, Application, and Infrastructure package files shown above.
-- `0007_cash_payments.sql`
-- `apps/api/tests/unit/packs/beachos/payments/test_payments.py`
+- Bill Closing Domain, Application, and Infrastructure files shown above.
+- `0008_bill_closing.sql`
+- Bill Closing unit tests.
 
 ## 4. Files Modified
 
-- Billing Domain, Application, and PostgreSQL reader.
-- Backend composition, identity, HTTP API, and migration runner.
-- Ordering PostgreSQL integration test and migration verification test.
-- Billing workspace, API client, and frontend tests.
+- Billing Domain, Application DTOs, and PostgreSQL projection.
+- Payment persistence restoration.
+- Ordering Domain and persistence boundary to enforce closed-Bill read-only
+  behavior.
+- Backend API, composition, identity, migration runner, and integration tests.
+- Billing frontend workspace, client, and tests.
 - `docs/simulation/FIRST_OPERATIONAL_DAY.md`
 - `IMPLEMENTATION_REPORT.md`
 
 ## 5. Commands Executed
 
-Repository inspection; `apply_patch`; Ruff format/lint; mypy; backend unit
-tests; integration-test collection; Prettier; ESLint; TypeScript type checking;
-Vitest; Vite build.
+Repository inspection; `apply_patch`; Ruff format/lint; mypy; pytest unit;
+integration-test collection; Prettier; ESLint; TypeScript checking; Vitest; Vite
+production build.
 
 No dependencies were installed.
 
@@ -52,7 +54,7 @@ No dependencies were installed.
 | Check                            | Result                   |
 | -------------------------------- | ------------------------ |
 | Backend format/lint              | Passed                   |
-| Backend type check               | Passed: 101 source files |
+| Backend type check               | Passed: 108 source files |
 | Backend unit tests               | Passed                   |
 | Integration test collection      | Passed: 37               |
 | PostgreSQL integration execution | Not available locally    |
@@ -63,67 +65,70 @@ No dependencies were installed.
 
 ## 7. Test Results
 
-- Backend unit tests: 141 passed, 0 failed, 0 skipped.
-- Frontend tests: 35 passed, 0 failed, 0 skipped across 7 files.
-- PostgreSQL integration tests: 37 collected; execution requires an isolated
+- Backend unit: 145 passed, 0 failed, 0 skipped.
+- Frontend: 36 passed, 0 failed, 0 skipped across 7 files.
+- PostgreSQL integration: 37 tests collected. Execution requires an isolated
   PostgreSQL 17 database through `BEACHOS_TEST_DATABASE_URL`.
 
-Tests cover exact-full validation, rejection of partial/zero/excess amounts,
-Cash-only history, duplicate prevention, restoration invariants, idempotent
-application orchestration, API client behavior, Billing projection, immutable
-Ordering history, Payment event persistence, and Activity Log persistence.
+Coverage includes unpaid rejection, single close event, duplicate-command
+idempotency, duplicate-close rejection, invalid restoration, unchanged
+Customer Group/location results, Billing projection, read-only ordering after
+closing, financial-history preservation, optimistic concurrency, Activity Log,
+and frontend API behavior.
 
 ## 8. Known Issues
 
-- PostgreSQL integration execution remains pending because no local PostgreSQL
-  client/server or `BEACHOS_TEST_DATABASE_URL` is available.
-- Production authentication and authorization remain absent; the temporary
-  development identity holds `RECORD_PAYMENTS`.
+- PostgreSQL-backed execution remains pending because no local PostgreSQL 17
+  test database is available.
+- Production identity is absent; the temporary development identity holds
+  `CLOSE_BILL`.
 
 ## 9. Technical Debt
 
-- Only one full Cash Payment is supported.
-- Partial/split/excess Payments, other methods, tips, refunds, reversals, change,
-  discounts, and currency conversion remain deliberately excluded.
-- A later financial obligation after full Payment can make the Bill Balance
-  positive again, but a second Payment is outside this MVP and remains blocked.
+- Bill reopening and corrections remain forbidden and unimplemented.
+- Customer Group Completion, departure, and Service Location release remain
+  deliberately separate.
+- Closing currently shares the existing immutable financial stream with Payment
+  facts; no event publication mechanism outside that transaction was added.
 
 ## Completed Work
 
-- Added an event-sourced Payment aggregate and approved events.
-- Added application capability verification, command validation, idempotency,
-  and orchestration.
-- Added versioned PostgreSQL stream, events, receipt, and Activity Log tables.
-- Added optimistic concurrency and atomic transaction boundaries.
-- Added real `POST /payments/cash` API and error mapping.
-- Updated Billing to expose Payment history, Balance, and `FULLY_PAID` status.
-- Added a real frontend Cash Payment action with processing, success, confirmed
-  history, and unknown-outcome guidance.
-- Advanced the First Operational Day through confirmed Payment.
+- Added event-sourced Bill Closing aggregate and `Bill Closed` event.
+- Enforced `FULLY_PAID → CLOSED` as the only transition.
+- Added capability verification, command validation, idempotent receipt, atomic
+  Activity Log, and optimistic concurrency.
+- Added migration `0008_bill_closing.sql`.
+- Added real `POST /bills/close` endpoint and error mapping.
+- Added closed status, actor, time, and explicit operational state to Billing.
+- Prevented closed Bills from receiving new Orders or Bill Lines.
+- Added Billing workspace close action with processing, success, error, and
+  unknown-outcome guidance.
+- Advanced the First Operational Day through Bill Closing only.
 
 ## Deferred Work
 
-All explicitly excluded Payment variants and Bill Closing.
+Customer Group Completion, Departure, Service Location release, Venue Closing,
+Bill reopening, and corrections.
 
 ## Open Product Owner Questions
 
-No decision blocks this MVP. Existing questions for Bill Closing, Customer Group
-Completion, Departure, and Venue Closing remain unresolved.
+No decision blocks Bill Closing MVP. Completion and departure conditions remain
+unresolved and were not inferred.
 
 ## Architecture Decisions
 
-No new architecture was introduced. Payment owns its immutable event stream;
-Billing projects those confirmed facts alongside immutable obligation events.
-The command receipt and Activity Log share the Payment transaction.
+No new architecture was introduced. Bill Closing appends to the existing
+immutable financial event stream and uses its stream version as the concurrency
+boundary. Billing projects the event; Ordering checks it before accepting new
+financial obligations.
 
 ## Operational Coverage
 
-The executable day now reaches confirmed full Cash Payment and zero Balance.
-This does not automatically close the Bill, complete the Customer Group, release
-the Service Location, or confirm departure.
+The operational day now reaches a read-only closed Bill. The Customer Group
+still remains `ACTIVE`, the Service Location remains occupied, and no departure
+or completion event exists.
 
 ## 10. Next Recommended Task
 
-Resolve and implement **Bill Closing and Customer Group Completion**. This is the
-next mandatory operational gap after Payment and is required before Departure
-can release the Service Location safely.
+Implement **Customer Group Completion and Departure** after approving its exact
+conditions and sequence. It is now the next mandatory gap after Bill Closing.

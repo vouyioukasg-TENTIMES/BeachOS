@@ -69,16 +69,18 @@ class PaymentRepository:
         row = self._connection.execute(
             "SELECT stream_version FROM payment_streams WHERE bill_id=%s", (bill.bill_id,)
         ).fetchone()
+        event_rows = self._connection.execute(
+            """SELECT event_type,event_data,occurred_at FROM payment_events
+            WHERE bill_id=%s ORDER BY sequence""",
+            (bill.bill_id,),
+        ).fetchall()
         events = tuple(
             _event_from_row(event)
-            for event in self._connection.execute(
-                """SELECT event_type,event_data,occurred_at FROM payment_events
-                WHERE bill_id=%s ORDER BY sequence""",
-                (bill.bill_id,),
-            ).fetchall()
+            for event in event_rows
+            if event["event_type"] in {"PAYMENT_RECORDED", "BILL_FULLY_PAID"}
         )
         expected = row["stream_version"] if row else 0
-        if expected != len(events):
+        if expected != len(event_rows):
             raise PaymentConcurrencyError("Payment event stream is inconsistent")
         self._expected[bill.bill_id] = expected
         return PaymentAggregate.restore(

@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getRunningBill, recordFullCashPayment, type RunningBill } from './billingApi';
+import {
+  closeFullyPaidBill,
+  getRunningBill,
+  recordFullCashPayment,
+  type RunningBill,
+} from './billingApi';
 
 export function BillingWorkspace({ customerGroupId }: { customerGroupId: string }) {
   const [bill, setBill] = useState<RunningBill | null | undefined>();
@@ -8,6 +13,9 @@ export function BillingWorkspace({ customerGroupId }: { customerGroupId: string 
   const [paymentRequestId, setPaymentRequestId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [closingRequestId, setClosingRequestId] = useState<string | null>(null);
+  const [closingError, setClosingError] = useState<string | null>(null);
 
   useEffect(() => {
     setBill(undefined);
@@ -34,6 +42,24 @@ export function BillingWorkspace({ customerGroupId }: { customerGroupId: string 
       setPaymentError(reason instanceof Error ? reason.message : 'Payment outcome is unknown.');
     } finally {
       setPaying(false);
+    }
+  }
+
+  async function closeBill() {
+    if (!bill || bill.status !== 'FULLY_PAID' || closing) return;
+    const requestId = closingRequestId ?? crypto.randomUUID();
+    setClosingRequestId(requestId);
+    setClosing(true);
+    setClosingError(null);
+    try {
+      await closeFullyPaidBill(customerGroupId, requestId);
+      setBill(await getRunningBill(customerGroupId));
+      setClosingRequestId(null);
+      setMessage('Bill closed. Customer Group remains active and the Service Location occupied.');
+    } catch (reason) {
+      setClosingError(reason instanceof Error ? reason.message : 'Closing outcome is unknown.');
+    } finally {
+      setClosing(false);
     }
   }
 
@@ -101,7 +127,10 @@ export function BillingWorkspace({ customerGroupId }: { customerGroupId: string 
         ) : (
           <p>No confirmed Payment has been recorded.</p>
         )}
-        <button disabled={paying || bill.balance === 0} onClick={() => void payInCash()}>
+        <button
+          disabled={paying || bill.balance === 0 || bill.status === 'CLOSED'}
+          onClick={() => void payInCash()}
+        >
           {paying
             ? 'Recording Cash Payment…'
             : bill.balance === 0
@@ -112,6 +141,29 @@ export function BillingWorkspace({ customerGroupId }: { customerGroupId: string 
           <p className="blocking-message" role="alert">
             {paymentError} Reload the Bill before deciding whether to retry. Retrying this action
             uses the same request identity.
+          </p>
+        )}
+      </section>
+      <section className="draft-panel">
+        <h2>Bill Closing</h2>
+        {bill.status === 'CLOSED' ? (
+          <p>
+            Closed by {bill.closed_by_id} at {bill.closed_at}. The Customer Group remains active and
+            the Service Location remains occupied.
+          </p>
+        ) : (
+          <p>Closing is available only after the Bill is fully paid.</p>
+        )}
+        <button disabled={closing || bill.status !== 'FULLY_PAID'} onClick={() => void closeBill()}>
+          {closing
+            ? 'Closing Bill…'
+            : bill.status === 'CLOSED'
+              ? 'Bill closed'
+              : 'Close fully paid Bill'}
+        </button>
+        {closingError && closingRequestId && (
+          <p className="blocking-message" role="alert">
+            {closingError} Reload the Bill before retrying with the same request identity.
           </p>
         )}
       </section>

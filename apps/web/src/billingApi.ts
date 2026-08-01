@@ -18,6 +18,8 @@ export interface RunningBill {
   status: string;
   lines: BillLine[];
   payments: Payment[];
+  closed_by_id: string | null;
+  closed_at: string | null;
   version: number;
 }
 
@@ -69,4 +71,33 @@ export async function recordFullCashPayment(
     throw new Error(body?.error?.message ?? 'The Cash Payment was not recorded.');
   }
   return (await response.json()) as PaymentResult;
+}
+
+export interface CloseBillResult {
+  request_id: string;
+  bill_id: string;
+  customer_group_id: string;
+  status: 'CLOSED';
+  closed_by_id: string;
+  closed_at: string;
+  customer_group_status: 'ACTIVE';
+  service_location_status: 'OCCUPIED';
+}
+
+export async function closeFullyPaidBill(
+  customerGroupId: string,
+  requestId: string,
+): Promise<CloseBillResult> {
+  const response = await fetch('/api/bills/close', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ request_id: requestId, customer_group_id: customerGroupId }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as {
+      error?: { message?: string };
+    } | null;
+    throw new Error(body?.error?.message ?? 'The Bill was not closed.');
+  }
+  return (await response.json()) as CloseBillResult;
 }

@@ -201,6 +201,7 @@ class CustomerGroup:
         service_location_id: str,
         responsible_waiter_id: str,
         status: CustomerGroupStatus,
+        bill_closed: bool = False,
     ) -> None:
         self._customer_group_id = _required(customer_group_id, "Customer Group id")
         self._venue_id = _required(venue_id, "Venue id")
@@ -209,6 +210,7 @@ class CustomerGroup:
         if not isinstance(status, CustomerGroupStatus):
             raise OrderingError("Customer Group status must be ACTIVE or COMPLETED")
         self._status = status
+        self._bill_closed = bill_closed
         self._orders: list[Order] = []
         self._kitchen_tickets: list[KitchenTicket] = []
         self._bar_tickets: list[BarTicket] = []
@@ -226,6 +228,7 @@ class CustomerGroup:
         responsible_waiter_id: str,
         status: CustomerGroupStatus,
         events: tuple[OrderingEvent, ...],
+        bill_closed: bool = False,
     ) -> CustomerGroup:
         group = cls(
             customer_group_id=customer_group_id,
@@ -233,6 +236,7 @@ class CustomerGroup:
             service_location_id=service_location_id,
             responsible_waiter_id=responsible_waiter_id,
             status=status,
+            bill_closed=bill_closed,
         )
         for event in events:
             group._apply(event)
@@ -263,6 +267,8 @@ class CustomerGroup:
 
         if self._status is not CustomerGroupStatus.ACTIVE:
             raise OrderingError("a Completed Customer Group cannot receive a new Order")
+        if self._bill_closed:
+            raise OrderingError("a closed Bill cannot receive new Orders or Bill Lines")
         if not draft_items:
             raise OrderingError("an Order requires at least one Order Item")
 

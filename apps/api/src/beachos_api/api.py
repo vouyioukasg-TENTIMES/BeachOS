@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from beachos_api.composition import (
     ConfigurationError,
     bar_service,
+    bill_closing_service,
     billing_service,
     guest_arrival_service,
     kitchen_service,
@@ -39,6 +40,17 @@ from beachos_api.packs.beachos.bar.infrastructure.errors import (
     BarConcurrencyError,
     BarInfrastructureError,
 )
+from beachos_api.packs.beachos.bill_closing.application import (
+    BillClosingService,
+    CloseBillCommand,
+    CloseBillResult,
+)
+from beachos_api.packs.beachos.bill_closing.application.service import (
+    BillClosingApplicationError,
+    BillClosingAuthorizationError,
+    BillClosingNotFoundError,
+)
+from beachos_api.packs.beachos.bill_closing.infrastructure import BillClosingConcurrencyError
 from beachos_api.packs.beachos.billing.application import BillDTO as RunningBillDTO
 from beachos_api.packs.beachos.billing.application import BillingService
 from beachos_api.packs.beachos.guest_arrival.application import (
@@ -433,6 +445,7 @@ Identity = Annotated[DevelopmentIdentity, Depends(development_identity)]
 VenueId = Annotated[str, Query(min_length=1)]
 OrderingServiceDependency = Annotated[OrderingService, Depends(ordering_service)]
 BillingServiceDependency = Annotated[BillingService, Depends(billing_service)]
+BillClosingServiceDependency = Annotated[BillClosingService, Depends(bill_closing_service)]
 PaymentServiceDependency = Annotated[PaymentService, Depends(payment_service)]
 GuestArrivalServiceDependency = Annotated[GuestArrivalService, Depends(guest_arrival_service)]
 CustomerGroupId = Annotated[str, Query(min_length=1)]
@@ -894,6 +907,8 @@ class RunningBillResponse(BaseModel):
     status: str
     lines: tuple[RunningBillLineResponse, ...]
     payments: tuple[PaymentSummaryResponse, ...]
+    closed_by_id: str | None
+    closed_at: datetime | None
     version: int
 
     @classmethod
@@ -929,8 +944,31 @@ class RunningBillResponse(BaseModel):
                 )
                 for payment in bill.payments
             ),
+            closed_by_id=bill.closed_by_id,
+            closed_at=bill.closed_at,
             version=bill.version,
         )
+
+
+class CloseBillRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    request_id: str = Field(min_length=1)
+    customer_group_id: str = Field(min_length=1)
+
+
+class CloseBillResponse(BaseModel):
+    request_id: str
+    bill_id: str
+    customer_group_id: str
+    status: str
+    closed_by_id: str
+    closed_at: datetime
+    customer_group_status: str
+    service_location_status: str
+
+    @classmethod
+    def from_application(cls, result: CloseBillResult) -> CloseBillResponse:
+        return cls(**{field: getattr(result, field) for field in cls.model_fields})
 
 
 class RecordCashPaymentRequest(BaseModel):
@@ -970,6 +1008,19 @@ def running_bill(
     del identity
     bill = service.get_bill(customer_group_id=customer_group_id)
     return RunningBillResponse.from_application(bill) if bill else None
+
+
+@router.post("/bills/close", response_model=CloseBillResponse)
+def close_bill(
+    payload: CloseBillRequest,
+    service: BillClosingServiceDependency,
+    identity: Identity,
+) -> CloseBillResponse:
+    return CloseBillResponse.from_application(
+        service.close_bill(
+            CloseBillCommand(payload.request_id, identity.actor_id, payload.customer_group_id)
+        )
+    )
 
 
 @router.post("/payments/cash", response_model=PaymentResponse)
@@ -1281,3 +1332,19 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(PaymentApplicationError)
     def payment_rejected(_: Request, error: PaymentApplicationError) -> JSONResponse:
         return _error(409, "payment_rejected", str(error))
+
+    @app.exception_handler(BillClosingAuthorizationError)
+    def bill_closing_denied(_: Request, error: BillClosingAuthorizationError) -> JSONResponse:
+        return _error(403, "bill_closing_forbidden", str(error))
+
+    @app.exception_handler(BillClosingNotFoundError)
+    def bill_closing_missing(_: Request, error: BillClosingNotFoundError) -> JSONResponse:
+        return _error(404, "bill_not_found", str(error))
+
+    @app.exception_handler(BillClosingConcurrencyError)
+    def bill_closing_conflict(_: Request, __: BillClosingConcurrencyError) -> JSONResponse:
+        return _error(409, "bill_closing_conflict", "Bill changed. Reload before closing.")
+
+    @app.exception_handler(BillClosingApplicationError)
+    def bill_closing_rejected(_: Request, error: BillClosingApplicationError) -> JSONResponse:
+        return _error(409, "bill_closing_rejected", str(error))

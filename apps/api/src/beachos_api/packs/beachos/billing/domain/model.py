@@ -48,7 +48,14 @@ class PaymentRecorded:
     occurred_at: datetime
 
 
-BillingEvent = BillCreated | BillLineAdded | PaymentRecorded
+@dataclass(frozen=True, slots=True)
+class BillClosed:
+    bill_id: str
+    closed_by_id: str
+    occurred_at: datetime
+
+
+BillingEvent = BillCreated | BillLineAdded | PaymentRecorded | BillClosed
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,6 +79,7 @@ class Bill:
         self._currency: str | None = None
         self._lines: list[BillLine] = []
         self._payments: list[PaymentRecorded] = []
+        self._closed: BillClosed | None = None
         self._version = 0
 
     @classmethod
@@ -94,6 +102,11 @@ class Bill:
             return
         if self._bill_id is None or event.bill_id != self._bill_id:
             raise BillingError("Bill Line must belong to the restored Bill")
+        if isinstance(event, BillClosed):
+            if self.balance != 0 or self._closed is not None:
+                raise BillingError("Bill Closed requires one fully paid, open Bill")
+            self._closed = event
+            return
         if isinstance(event, PaymentRecorded):
             if event.currency.upper() != self._currency or event.amount <= 0:
                 raise BillingError("Payment must be positive and match the Bill currency")
@@ -153,6 +166,10 @@ class Bill:
     @property
     def balance(self) -> Decimal:
         return self.total - sum((payment.amount for payment in self._payments), Decimal("0"))
+
+    @property
+    def closed(self) -> BillClosed | None:
+        return self._closed
 
     @property
     def version(self) -> int:

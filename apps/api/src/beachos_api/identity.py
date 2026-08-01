@@ -29,6 +29,7 @@ class FakeIdentityProvider:
                 "ACKNOWLEDGE_BAR_TICKET",
                 "ACKNOWLEDGE_KITCHEN_TICKET",
                 "COLLECT_TICKET",
+                "CLOSE_BILL",
                 "DELIVER_TICKET",
                 "MARK_BAR_TICKET_READY",
                 "MARK_KITCHEN_TICKET_READY",
@@ -129,6 +130,20 @@ class FakePaymentAuthority:
             actor_id == identity.actor_id
             and identity.has_venue_access
             and "RECORD_PAYMENTS" in identity.capabilities
+        )
+
+
+class FakeBillClosingAuthority:
+    def __init__(self, identities: FakeIdentityProvider) -> None:
+        self._identities = identities
+
+    def can_close_bill(self, *, actor_id: str, customer_group_id: str) -> bool:
+        del customer_group_id
+        identity = self._identities.current()
+        return (
+            actor_id == identity.actor_id
+            and identity.has_venue_access
+            and "CLOSE_BILL" in identity.capabilities
         )
 
 

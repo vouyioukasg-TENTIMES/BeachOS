@@ -21,6 +21,7 @@ MIGRATIONS = (
     ("0005", "0005_bar_operations.sql"),
     ("0006", "0006_basic_fulfilment.sql"),
     ("0007", "0007_cash_payments.sql"),
+    ("0008", "0008_bill_closing.sql"),
 )
 
 

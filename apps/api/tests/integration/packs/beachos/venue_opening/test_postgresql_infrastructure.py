@@ -179,6 +179,7 @@ def test_migrations_are_versioned_idempotent_and_checksummed(
             ("0005", "0005_bar_operations.sql"),
             ("0006", "0006_basic_fulfilment.sql"),
             ("0007", "0007_cash_payments.sql"),
+            ("0008", "0008_bill_closing.sql"),
         ]
         connection.execute(
             """

@@ -4,6 +4,7 @@ import os
 
 from beachos_api.identity import (
     FakeBarAuthority,
+    FakeBillClosingAuthority,
     FakeGuestArrivalAuthority,
     FakeIdentityProvider,
     FakeKitchenAuthority,
@@ -13,6 +14,10 @@ from beachos_api.identity import (
 )
 from beachos_api.packs.beachos.bar.application import BarService
 from beachos_api.packs.beachos.bar.infrastructure import PostgresBarUnitOfWorkFactory
+from beachos_api.packs.beachos.bill_closing.application import BillClosingService
+from beachos_api.packs.beachos.bill_closing.infrastructure import (
+    PostgresBillClosingUnitOfWorkFactory,
+)
 from beachos_api.packs.beachos.billing.application import BillingService
 from beachos_api.packs.beachos.billing.infrastructure import PostgresBillReader
 from beachos_api.packs.beachos.guest_arrival.application import GuestArrivalService
@@ -152,4 +157,16 @@ def payment_service() -> PaymentService:
         clock=SystemClock(),
         identities=UUIDPaymentIdentities(),
         units=PostgresPaymentUnitOfWorkFactory(connection_string),
+    )
+
+
+def bill_closing_service() -> BillClosingService:
+    connection_string = os.environ.get("BEACHOS_DATABASE_URL")
+    if not connection_string:
+        raise ConfigurationError("BEACHOS_DATABASE_URL is required")
+    identities = FakeIdentityProvider()
+    return BillClosingService(
+        authority=FakeBillClosingAuthority(identities),
+        clock=SystemClock(),
+        units=PostgresBillClosingUnitOfWorkFactory(connection_string),
     )

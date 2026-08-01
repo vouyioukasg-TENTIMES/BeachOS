@@ -1,3 +1,19 @@
-from .model import Bill, BillCreated, BillingError, BillLine, BillLineAdded, PaymentRecorded
+from .model import (
+    Bill,
+    BillClosed,
+    BillCreated,
+    BillingError,
+    BillLine,
+    BillLineAdded,
+    PaymentRecorded,
+)
 
-__all__ = ["Bill", "BillCreated", "BillLine", "BillLineAdded", "BillingError", "PaymentRecorded"]
+__all__ = [
+    "Bill",
+    "BillClosed",
+    "BillCreated",
+    "BillLine",
+    "BillLineAdded",
+    "BillingError",
+    "PaymentRecorded",
+]

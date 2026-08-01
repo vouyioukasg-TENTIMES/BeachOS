@@ -12,9 +12,23 @@ from fastapi.testclient import TestClient
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from beachos_api.composition import billing_service, ordering_service, payment_service
-from beachos_api.identity import FakeIdentityProvider, FakeOrderingAuthority, FakePaymentAuthority
+from beachos_api.composition import (
+    bill_closing_service,
+    billing_service,
+    ordering_service,
+    payment_service,
+)
+from beachos_api.identity import (
+    FakeBillClosingAuthority,
+    FakeIdentityProvider,
+    FakeOrderingAuthority,
+    FakePaymentAuthority,
+)
 from beachos_api.main import create_app
+from beachos_api.packs.beachos.bill_closing.application import BillClosingService
+from beachos_api.packs.beachos.bill_closing.infrastructure import (
+    PostgresBillClosingUnitOfWorkFactory,
+)
 from beachos_api.packs.beachos.billing.application import BillingService
 from beachos_api.packs.beachos.billing.infrastructure import PostgresBillReader
 from beachos_api.packs.beachos.ordering.application import OrderingService
@@ -94,6 +108,11 @@ def test_real_api_persists_and_restores_one_atomic_order_round(
         identities=UUIDPaymentIdentities(),
         units=PostgresPaymentUnitOfWorkFactory(postgres_connection_string),
     )
+    app.dependency_overrides[bill_closing_service] = lambda: BillClosingService(
+        authority=FakeBillClosingAuthority(identities),
+        clock=SystemClock(),
+        units=PostgresBillClosingUnitOfWorkFactory(postgres_connection_string),
+    )
     client = TestClient(app)
     payload = {
         "request_id": "request-1",
@@ -135,15 +154,43 @@ def test_real_api_persists_and_restores_one_atomic_order_round(
     assert paid_bill["balance"] == "0.00"
     assert paid_bill["status"] == "FULLY_PAID"
     assert len(paid_bill["payments"]) == 1
+    close_payload = {"request_id": "close-request-1", "customer_group_id": "group-1"}
+    closed = client.post("/bills/close", json=close_payload)
+    assert closed.status_code == 200
+    assert closed.json()["customer_group_status"] == "ACTIVE"
+    assert closed.json()["service_location_status"] == "OCCUPIED"
+    assert client.post("/bills/close", json=close_payload).json() == closed.json()
+    closed_bill = client.get("/billing/customer-groups/group-1").json()
+    assert closed_bill["status"] == "CLOSED"
+    assert len(closed_bill["lines"]) == 2 and len(closed_bill["payments"]) == 1
+    rejected_order = client.post(
+        "/orders",
+        json={
+            "request_id": "request-after-close",
+            "customer_group_id": "group-1",
+            "items": [{"menu_item_id": "coffee", "quantity": "1"}],
+        },
+    )
+    assert rejected_order.status_code == 409
 
     with psycopg.connect(postgres_connection_string) as connection:
         assert connection.execute("SELECT count(*) FROM ordering_events").fetchone()[0] == 8
         assert (
             connection.execute("SELECT count(*) FROM ordering_command_receipts").fetchone()[0] == 1
         )
-        assert connection.execute("SELECT count(*) FROM payment_events").fetchone()[0] == 2
+        assert connection.execute("SELECT count(*) FROM payment_events").fetchone()[0] == 3
         assert connection.execute("SELECT count(*) FROM payment_activity_log").fetchone()[0] == 1
+        closing_logs = connection.execute(
+            "SELECT count(*) FROM bill_closing_activity_log"
+        ).fetchone()[0]
+        assert closing_logs == 1
         assert connection.execute("SELECT count(*) FROM ordering_events").fetchone()[0] == 8
+        assert (
+            connection.execute(
+                "SELECT status FROM ordering_customer_groups WHERE customer_group_id='group-1'"
+            ).fetchone()[0]
+            == "ACTIVE"
+        )
 
 
 def test_transaction_rolls_back_without_commit(postgres_connection_string: str) -> None:

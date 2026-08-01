@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getRunningBill, recordFullCashPayment } from './billingApi';
+import { closeFullyPaidBill, getRunningBill, recordFullCashPayment } from './billingApi';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -18,6 +18,8 @@ describe('Billing API', () => {
             status: 'OPEN',
             lines: [],
             payments: [],
+            closed_by_id: null,
+            closed_at: null,
             version: 3,
           }),
           { status: 200 },
@@ -66,5 +68,29 @@ describe('Billing API', () => {
       '/api/payments/cash',
       expect.objectContaining({ body: expect.stringContaining('request-1') }),
     );
+  });
+
+  it('closes a fully paid Bill with a stable request identity', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            request_id: 'close-1',
+            bill_id: 'bill-1',
+            customer_group_id: 'group-1',
+            status: 'CLOSED',
+            closed_by_id: 'cashier-1',
+            closed_at: '2026-08-01T18:05:00Z',
+            customer_group_status: 'ACTIVE',
+            service_location_status: 'OCCUPIED',
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+    const result = await closeFullyPaidBill('group-1', 'close-1');
+    expect(result.customer_group_status).toBe('ACTIVE');
+    expect(result.service_location_status).toBe('OCCUPIED');
   });
 });
