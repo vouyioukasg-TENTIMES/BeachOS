@@ -491,9 +491,10 @@ within future approved responsibility rules
 **Business Decision:** Does the Bill accurately explain every Financial
 Obligation and current Balance before Payment?
 
-**Current Facts:** A Beach Sunbed opening should have created the first
-obligation. Approved Orders add Bill Lines. A Customer Group may have no Bill
-only when no financial obligation has arisen.
+**Current Facts:** A Beach Sunbed opening creates the first obligation. Approved
+Orders add permanent Bill Lines. The Billing capability restores one running
+Bill from those authoritative events. A Customer Group has no Bill when no
+Financial Obligation has arisen.
 
 **Operational Readiness:** Review is meaningful when one authoritative Bill
 contains all approved obligations and recorded Payments. Correction rules are
@@ -511,18 +512,11 @@ correction or treat a disputed amount as resolved.
 **Business Events:** None for simply reviewing. `Bill Line Reversed` and later
 replacement effects are Command gated.
 
-**Capability Used:** Ordering currently creates and reads its financial
-consequences; no complete Billing capability exists.
+**Capability Used:** Billing, Customer Group Opening, and Ordering.
 
-**Expected Outcome:** The business should reach an explainable Bill, but current
-coverage cannot guarantee the Beach Sunbed obligation or a complete financial
-view across the whole journey.
-
-> **MISSING CAPABILITY**
->
-> There is no authoritative end-to-end Billing capability. The Ordering slice's
-> Bill view cannot replace Customer Group opening charges, correction governance,
-> closing rules, or a complete financial lifecycle.
+**Expected Outcome:** The business reaches one explainable running Bill that
+includes the opening charge and every approved Order obligation without
+rewriting historical prices. Corrections and closing remain separately gated.
 
 ## 13. Payment Is Requested
 
@@ -710,7 +704,10 @@ The following working product slices exist in the repository:
    collect a `READY` Ticket, and the Responsible Waiter or another authorized
    delivery person can confirm that the whole Ticket reached the correct
    Customer Group. The current responsibility and next action remain visible.
-10. **Operational Intelligence guidance** — approved principles define readiness,
+10. **Billing** — one event-restored running Bill explains the Beach Sunbed
+    opening obligation and all approved Order Bill Lines; an explicit no-Bill
+    state remains possible.
+11. **Operational Intelligence guidance** — approved principles define readiness,
     confidence, attention, blockers, advice, and human decision boundaries.
 
 These are completed slices, not proof of complete operational coverage.
@@ -724,9 +721,8 @@ These are completed slices, not proof of complete operational coverage.
 4. Responsible Service Staff handover.
 5. Advanced fulfilment exceptions, including partial item or quantity handling,
    cancellation, remakes, substitutions, and returns.
-6. Authoritative Billing beyond the opening and Ordering obligations currently
-   supported.
-7. Payment recording and recovery.
+6. Payment recording and recovery.
+7. Bill correction and reversal governance.
 8. Bill Closing.
 9. Customer Group Completion, including the no-Bill path.
 10. Guest Departure and Service Location operational release.
@@ -793,8 +789,9 @@ contradictions:
 5. The approved Service Operations architecture preserves separate Kitchen and
    Bar business ownership while allowing their confirmed mechanics to remain
    consistent.
-6. No complete financial boundary currently joins Beach Sunbed charges, Order
-   obligations, Payments, closing, and Customer Group completion.
+6. Billing now joins Beach Sunbed charges and Order obligations into one
+   explainable view. Payments, closing, and Customer Group completion remain
+   separate gaps.
 7. Temporary development identity allows vertical-slice testing but cannot
    establish production Operational Confidence about human authority.
 8. The next continuity break is Customer Group Transfer: destination, charging,
@@ -808,8 +805,9 @@ conceptually consistent but **does not yet form one executable operational
 day**.
 
 The operational day now proceeds from Department Readiness through Venue
-Opening, Guest Arrival, Customer Group Opening, Ordering, and complete basic
-whole-Ticket fulfilment through `READY`, `COLLECTED`, and `DELIVERED`. It still
-cannot continue correctly through Customer Group Transfer, authoritative
-Billing, Payment, departure, or Venue closing. Expansion should preserve these
-gaps as explicit boundaries rather than bridge them with inferred behaviour.
+Opening, Guest Arrival, Customer Group Opening, Ordering, complete basic
+whole-Ticket fulfilment through `READY`, `COLLECTED`, and `DELIVERED`, and
+authoritative Bill Review. It still cannot continue correctly through Customer
+Group Transfer, Payment, departure, or Venue closing. Expansion should preserve
+these gaps as explicit boundaries rather than bridge them with inferred
+behaviour.

@@ -6,13 +6,14 @@ import { KitchenWorkspace } from './KitchenWorkspace';
 import { OrderingWorkspace } from './OrderingWorkspace';
 import { BarWorkspace } from './BarWorkspace';
 import { FulfilmentWorkspace } from './FulfilmentWorkspace';
+import { BillingWorkspace } from './BillingWorkspace';
 import './app.css';
 
 export function App() {
   const venueId = import.meta.env.VITE_VENUE_ID ?? 'venue-1';
   const customerGroupId = import.meta.env.VITE_CUSTOMER_GROUP_ID ?? 'customer-group-1';
   const [workspace, setWorkspace] = useState<
-    'host' | 'readiness' | 'arrival' | 'ordering' | 'kitchen' | 'bar' | 'fulfilment'
+    'host' | 'readiness' | 'arrival' | 'ordering' | 'kitchen' | 'bar' | 'fulfilment' | 'billing'
   >('host');
 
   return (
@@ -20,6 +21,9 @@ export function App() {
       <nav className="workspace-nav" aria-label="Workspaces">
         <button aria-pressed={workspace === 'host'} onClick={() => setWorkspace('host')}>
           Host
+        </button>
+        <button aria-pressed={workspace === 'billing'} onClick={() => setWorkspace('billing')}>
+          Billing
         </button>
         <button aria-pressed={workspace === 'readiness'} onClick={() => setWorkspace('readiness')}>
           Department Readiness
@@ -55,8 +59,10 @@ export function App() {
         <KitchenWorkspace venueId={venueId} />
       ) : workspace === 'bar' ? (
         <BarWorkspace venueId={venueId} />
-      ) : (
+      ) : workspace === 'fulfilment' ? (
         <FulfilmentWorkspace venueId={venueId} />
+      ) : (
+        <BillingWorkspace customerGroupId={customerGroupId} />
       )}
     </>
   );
