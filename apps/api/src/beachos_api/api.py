@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from beachos_api.composition import (
     ConfigurationError,
     bar_service,
+    billing_service,
     guest_arrival_service,
     kitchen_service,
     ordering_service,
@@ -37,6 +38,8 @@ from beachos_api.packs.beachos.bar.infrastructure.errors import (
     BarConcurrencyError,
     BarInfrastructureError,
 )
+from beachos_api.packs.beachos.billing.application import BillDTO as RunningBillDTO
+from beachos_api.packs.beachos.billing.application import BillingService
 from beachos_api.packs.beachos.guest_arrival.application import (
     GuestArrivalContextResult,
     GuestArrivalService,
@@ -417,6 +420,7 @@ Service = Annotated[VenueOpeningService, Depends(venue_opening_service)]
 Identity = Annotated[DevelopmentIdentity, Depends(development_identity)]
 VenueId = Annotated[str, Query(min_length=1)]
 OrderingServiceDependency = Annotated[OrderingService, Depends(ordering_service)]
+BillingServiceDependency = Annotated[BillingService, Depends(billing_service)]
 GuestArrivalServiceDependency = Annotated[GuestArrivalService, Depends(guest_arrival_service)]
 CustomerGroupId = Annotated[str, Query(min_length=1)]
 
@@ -846,6 +850,66 @@ def ordering_context(
     return OrderingContextResponse.from_application(
         service.get_context(customer_group_id=customer_group_id)
     )
+
+
+class RunningBillLineResponse(BaseModel):
+    bill_line_id: str
+    description: str
+    quantity: Decimal
+    unit_price: Decimal
+    amount: Decimal
+    currency: str
+    source: str
+    occurred_at: datetime
+
+
+class RunningBillResponse(BaseModel):
+    bill_id: str
+    customer_group_id: str
+    currency: str
+    total: Decimal
+    balance: Decimal
+    status: str
+    lines: tuple[RunningBillLineResponse, ...]
+    version: int
+
+    @classmethod
+    def from_application(cls, bill: RunningBillDTO) -> RunningBillResponse:
+        return cls(
+            bill_id=bill.bill_id,
+            customer_group_id=bill.customer_group_id,
+            currency=bill.currency,
+            total=bill.total,
+            balance=bill.balance,
+            status=bill.status,
+            lines=tuple(
+                RunningBillLineResponse(
+                    bill_line_id=line.bill_line_id,
+                    description=line.description,
+                    quantity=line.quantity,
+                    unit_price=line.unit_price,
+                    amount=line.amount,
+                    currency=line.currency,
+                    source=line.source,
+                    occurred_at=line.occurred_at,
+                )
+                for line in bill.lines
+            ),
+            version=bill.version,
+        )
+
+
+@router.get(
+    "/billing/customer-groups/{customer_group_id}", response_model=RunningBillResponse | None
+)
+def running_bill(
+    customer_group_id: str,
+    service: BillingServiceDependency,
+    identity: Identity,
+) -> RunningBillResponse | None:
+    del identity
+    bill = service.get_bill(customer_group_id=customer_group_id)
+    return RunningBillResponse.from_application(bill) if bill else None
 
 
 @router.post("/orders", response_model=SubmitOrderResponse)

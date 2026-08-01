@@ -12,9 +12,11 @@ from fastapi.testclient import TestClient
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from beachos_api.composition import ordering_service
+from beachos_api.composition import billing_service, ordering_service
 from beachos_api.identity import FakeIdentityProvider, FakeOrderingAuthority
 from beachos_api.main import create_app
+from beachos_api.packs.beachos.billing.application import BillingService
+from beachos_api.packs.beachos.billing.infrastructure import PostgresBillReader
 from beachos_api.packs.beachos.ordering.application import OrderingService
 from beachos_api.packs.beachos.ordering.infrastructure import (
     PostgresOrderingUnitOfWorkFactory,
@@ -77,6 +79,9 @@ def test_real_api_persists_and_restores_one_atomic_order_round(
 ) -> None:
     app = create_app()
     app.dependency_overrides[ordering_service] = lambda: service(postgres_connection_string)
+    app.dependency_overrides[billing_service] = lambda: BillingService(
+        PostgresBillReader(postgres_connection_string)
+    )
     client = TestClient(app)
     payload = {
         "request_id": "request-1",
@@ -97,6 +102,11 @@ def test_real_api_persists_and_restores_one_atomic_order_round(
     context = client.get("/ordering/context", params={"customer_group_id": "group-1"})
     assert context.status_code == 200
     assert len(context.json()["orders"]) == 1
+    bill = client.get("/billing/customer-groups/group-1")
+    assert bill.status_code == 200
+    assert bill.json()["total"] == "18.00"
+    assert bill.json()["balance"] == "18.00"
+    assert len(bill.json()["lines"]) == 2
 
     with psycopg.connect(postgres_connection_string) as connection:
         assert connection.execute("SELECT count(*) FROM ordering_events").fetchone()[0] == 8

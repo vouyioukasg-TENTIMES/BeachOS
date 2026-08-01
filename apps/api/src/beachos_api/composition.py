@@ -12,6 +12,8 @@ from beachos_api.identity import (
 )
 from beachos_api.packs.beachos.bar.application import BarService
 from beachos_api.packs.beachos.bar.infrastructure import PostgresBarUnitOfWorkFactory
+from beachos_api.packs.beachos.billing.application import BillingService
+from beachos_api.packs.beachos.billing.infrastructure import PostgresBillReader
 from beachos_api.packs.beachos.guest_arrival.application import GuestArrivalService
 from beachos_api.packs.beachos.guest_arrival.infrastructure import (
     PostgresGuestArrivalUnitOfWorkFactory,
@@ -124,3 +126,11 @@ def bar_service() -> BarService:
         clock=SystemClock(),
         unit_of_work_factory=PostgresBarUnitOfWorkFactory(connection_string),
     )
+
+
+def billing_service() -> BillingService:
+    """Wire the read-only authoritative Billing projection."""
+    connection_string = os.environ.get("BEACHOS_DATABASE_URL")
+    if not connection_string:
+        raise ConfigurationError("BEACHOS_DATABASE_URL is required")
+    return BillingService(PostgresBillReader(connection_string))
