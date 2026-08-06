@@ -9,7 +9,7 @@ description = "Backend application for the BeachOS Platform"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
-  "fastapi>=0.129,<0.130",
+  "fastapi>=0.129,<0.142",
   "psycopg[binary]==3.3.4",
   "uvicorn[standard]>=0.34,<0.35",
 ]
