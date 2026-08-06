@@ -4,5 +4,8 @@ Scripts here must be safe, non-interactive by default, portable across supported
 
 - `check-environment.sh` reports whether proposed local tools are available.
 - `check-foundation.sh` validates the repository skeleton without installing dependencies.
+- `migrate-local-database.py` safely applies committed migrations to the configured local database.
+- `seed-local-development.py` adds missing non-operational configuration for local MVP execution.
+- `start-local.sh` starts PostgreSQL, migrations, local configuration, Backend, and Frontend.
 
 Destructive scripts and scripts requiring production secrets are prohibited without explicit design and review.

@@ -5,17 +5,32 @@ repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 environment_file="$repository_root/.env"
 compose_file="$repository_root/infrastructure/docker/compose.yaml"
 
+# Homebrew is not always present on PATH in non-interactive Mac shells.
+if [ -d /opt/homebrew/bin ]; then
+  PATH="/opt/homebrew/bin:$PATH"
+  export PATH
+fi
+
 if [ ! -f "$environment_file" ]; then
   echo "Missing .env. Run: cp .env.example .env" >&2
   exit 1
 fi
 
-for required_tool in docker node pnpm uv curl; do
+for required_tool in docker node uv curl; do
   if ! command -v "$required_tool" >/dev/null 2>&1; then
     echo "Missing required tool: $required_tool. See START_HERE.md." >&2
     exit 1
   fi
 done
+
+if command -v pnpm >/dev/null 2>&1; then
+  run_pnpm() { pnpm "$@"; }
+elif command -v corepack >/dev/null 2>&1; then
+  run_pnpm() { corepack pnpm@10.12.4 "$@"; }
+else
+  echo "Missing required tool: pnpm or Corepack. See START_HERE.md." >&2
+  exit 1
+fi
 
 set -a
 # This file is local, user-controlled configuration copied from .env.example.
@@ -60,12 +75,13 @@ echo "Applying committed database migrations…"
 (
   cd "$repository_root/apps/api"
   uv run python ../../scripts/migrate-local-database.py
+  uv run python ../../scripts/seed-local-development.py
 )
 
 echo "Starting BeachOS Backend…"
 (
   cd "$repository_root/apps/api"
-  uv run uvicorn beachos_api.main:app --reload --host 127.0.0.1 --port 8000
+  uv run uvicorn --app-dir src beachos_api.main:app --reload --host 127.0.0.1 --port 8000
 ) &
 api_pid=$!
 
@@ -82,7 +98,7 @@ done
 echo "Starting BeachOS Frontend…"
 (
   cd "$repository_root"
-  pnpm --filter @beachos/web dev --host 127.0.0.1
+  run_pnpm --filter @beachos/web dev --host 127.0.0.1
 ) &
 web_pid=$!
 

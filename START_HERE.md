@@ -12,8 +12,9 @@ Install these tools before continuing:
 
 1. **Git 2.39 or newer** — obtains the repository.
 2. **Node.js 24** — runs the web application. Node 22 or earlier is not supported.
-3. **Corepack** — normally included with Node.js and used to activate pnpm.
-4. **pnpm 10.12.4** — installs and runs the web application.
+3. **Corepack** — normally included with Node.js and runs the pinned pnpm version
+   without requiring administrator access.
+4. **pnpm 10.12.4 through Corepack** — installs and runs the web application.
 5. **Python 3.13** — runs the backend. Python 3.12 or earlier is not supported.
 6. **uv 0.8 or newer** — installs and runs the Python environment.
 7. **Docker Desktop with Docker Compose v2** — runs PostgreSQL 17 locally.
@@ -26,7 +27,7 @@ From the repository folder, check the tools:
 
 ```sh
 ./scripts/check-environment.sh
-pnpm --version
+corepack pnpm@10.12.4 --version
 curl --version
 ```
 
@@ -38,9 +39,7 @@ image `17`, and Docker Compose `v2`.
 Open **Terminal 1**, move into the repository folder, and run these commands exactly:
 
 ```sh
-corepack enable
-corepack prepare pnpm@10.12.4 --activate
-pnpm install --frozen-lockfile
+corepack pnpm@10.12.4 install --frozen-lockfile
 cd apps/api
 uv sync --locked --all-groups
 cd ../..
@@ -59,8 +58,9 @@ window** from the repository root:
 ./scripts/start-local.sh
 ```
 
-The command starts PostgreSQL, applies committed migrations, starts the Backend, waits
-for its health check, and starts the Frontend. It does not erase existing local data.
+The command starts PostgreSQL, applies committed migrations, creates missing local-only
+development configuration, starts the Backend, waits for its health check, and starts
+the Frontend. It does not erase or replace existing local data.
 
 Successful startup ends with:
 
@@ -87,6 +87,7 @@ set -a
 set +a
 cd apps/api
 uv run python ../../scripts/migrate-local-database.py
+uv run python ../../scripts/seed-local-development.py
 ```
 
 Expected messages include:
@@ -94,6 +95,7 @@ Expected messages include:
 ```text
 Container emerald-management-system-postgres-1 Started
 BeachOS database is ready: emerald_local on localhost
+Local BeachOS configuration is ready for Business Date YYYY-MM-DD.
 ```
 
 Docker may print `Running` instead of `Started` when PostgreSQL is already running.
@@ -105,7 +107,7 @@ set -a
 . ./.env
 set +a
 cd apps/api
-uv run uvicorn beachos_api.main:app --reload --host 127.0.0.1 --port 8000
+uv run uvicorn --app-dir src beachos_api.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 The Backend is successful when the terminal includes:
@@ -130,7 +132,7 @@ Expected response:
 ### Terminal 3 — Frontend
 
 ```sh
-pnpm --filter @beachos/web dev --host 127.0.0.1
+corepack pnpm@10.12.4 --filter @beachos/web dev --host 127.0.0.1
 ```
 
 The Frontend is successful when the terminal includes text similar to:
@@ -145,15 +147,12 @@ Open [http://127.0.0.1:5173](http://127.0.0.1:5173).
 ## 5. What to expect in the browser
 
 The BeachOS application shell should appear with its header, acting development user,
-role selector, and navigation. The current database contains only schema immediately
-after a clean checkout. The Overview may therefore say that the Venue context cannot be
-confirmed until approved local Venue configuration and representative data have been
-created. This is an honest empty-environment condition, not a startup failure.
-
-The repository does not currently contain an approved data seeder or reset command.
-Startup cannot create a Venue, choose a Business Date rollover policy, assign department
-owners, create Service Locations, or create a Menu without introducing business facts
-that have not been approved for this local environment.
+role selector, and navigation. On an empty local database, startup creates only the
+development configuration needed to open the existing MVP: Emerald Beach Club, the
+current Business Date, Kitchen and Bar department ownership, three Service Locations,
+and three Menu Items. It creates no readiness declarations, Customer Groups, Orders,
+Bills, Payments, or operational history. Running startup again preserves all existing
+local facts.
 
 ## 6. Common startup problems
 
@@ -164,10 +163,11 @@ Install it, close Terminal completely, open it again, and rerun the environment 
 
 ### pnpm reports an unsupported version
 
-Activate the repository's exact version:
+Run the repository's exact version through Corepack. This does not require administrator
+access to create a global command:
 
 ```sh
-corepack prepare pnpm@10.12.4 --activate
+corepack pnpm@10.12.4 --version
 ```
 
 ### Docker says it cannot connect to the daemon

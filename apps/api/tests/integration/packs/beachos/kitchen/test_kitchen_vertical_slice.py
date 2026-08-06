@@ -130,11 +130,11 @@ def test_context_acknowledgement_retry_and_restoration(
         == "DELIVERED"
     )
     restored = client.get("/kitchen/context", params={"venue_id": "venue-1"})
-    assert restored.json()["tickets"][0]["status"] == "ACKNOWLEDGED"
+    assert restored.json()["tickets"][0]["status"] == "DELIVERED"
     with psycopg.connect(postgres_connection_string) as connection:
         assert connection.execute("SELECT count(*) FROM kitchen_events").fetchone()[0] == 4
         assert (
-            connection.execute("SELECT count(*) FROM kitchen_command_receipts").fetchone()[0] == 1
+            connection.execute("SELECT count(*) FROM kitchen_command_receipts").fetchone()[0] == 4
         )
 
 

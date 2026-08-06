@@ -1,6 +1,11 @@
 #!/usr/bin/env sh
 set -eu
 
+if [ -d /opt/homebrew/bin ]; then
+  PATH="/opt/homebrew/bin:$PATH"
+  export PATH
+fi
+
 status=0
 
 check_tool() {
@@ -19,7 +24,7 @@ check_tool() {
 check_tool git --version
 check_tool node --version
 check_tool corepack --version
-check_tool python3 --version
+check_tool python3.13 --version
 check_tool uv --version
 check_tool docker --version
 

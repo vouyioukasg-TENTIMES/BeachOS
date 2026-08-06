@@ -26,4 +26,3 @@ volumes:
 
 networks:
   backend:
-    internal: true
