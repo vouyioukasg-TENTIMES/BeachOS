@@ -88,12 +88,18 @@ class PostgresVenueRepository:
             """,
             (venue_id, business_date.value),
         ).fetchone()
+        closing_report_row = self._connection.execute(
+            """SELECT 1 FROM venue_closing_reports
+            WHERE venue_id=%s AND business_date=%s""",
+            (venue_id, business_date.value),
+        ).fetchone()
 
         venue = restore_venue(
             venue_row=venue_row,
             department_rows=department_rows,
             declaration_rows=declaration_rows,
             report_row=report_row,
+            closing_report_exists=closing_report_row is not None,
         )
         key = (venue_id, business_date)
         self._loaded_versions[key] = venue.aggregate_version

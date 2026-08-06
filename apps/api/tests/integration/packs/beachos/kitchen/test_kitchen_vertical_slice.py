@@ -65,6 +65,10 @@ def postgres_connection_string() -> Iterator[str]:
         }
         with psycopg.connect(isolated) as connection:
             connection.execute(
+                """INSERT INTO venue_opening_venues VALUES
+                ('venue-1','2026-08-01','Emerald Beach Club','OPEN',0)"""
+            )
+            connection.execute(
                 """
                 INSERT INTO ordering_customer_groups VALUES
                 ('group-1', 'venue-1', 'B-12', 'waiter-1', 'ACTIVE', 1)

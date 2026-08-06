@@ -5,10 +5,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/venue': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-      },
+      ...Object.fromEntries(
+        ['/api', '/venue', '/guest-arrival', '/ordering', '/kitchen', '/bar'].map((path) => [
+          path,
+          { target: 'http://127.0.0.1:8000', changeOrigin: true },
+        ]),
+      ),
     },
   },
 });

@@ -1,0 +1,1 @@
+"""Guest Departure capability pack."""

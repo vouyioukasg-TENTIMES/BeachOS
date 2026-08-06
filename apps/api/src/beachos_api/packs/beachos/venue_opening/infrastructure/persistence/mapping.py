@@ -22,6 +22,7 @@ def restore_venue(
     department_rows: Sequence[Row],
     declaration_rows: Sequence[Row],
     report_row: Row | None,
+    closing_report_exists: bool = False,
 ) -> Venue:
     """Map authoritative rows to a Domain aggregate without replay."""
 
@@ -72,4 +73,5 @@ def restore_venue(
         opening_status=opening_status,
         opening_report=report,
         aggregate_version=venue_row["aggregate_version"],
+        closing_report_exists=closing_report_exists,
     )

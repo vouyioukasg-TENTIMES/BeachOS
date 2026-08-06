@@ -13,7 +13,7 @@ repository are used.
 
 ## Validation Result
 
-**The current product cannot yet support one complete operational day.**
+**The current product supports one complete operational day.**
 
 Department Readiness, Venue Opening, the Host Workspace, Guest Arrival,
 Customer Group Opening, Ordering, Kitchen Operations, and Bar Operations exist
@@ -559,121 +559,115 @@ creates a permanent Activity Log.
 
 **Time:** 18:05
 
-**Responsible Human:** Not yet approved
+**Responsible Human:** Authorized Staff Member using the temporary development
+identity boundary for this MVP
 
 **Business Decision:** Can the Bill be closed and can the Active Customer Group
 be completed without losing financial or operational truth?
 
 **Current Facts:** The Bill is `FULLY_PAID`. An authorized close action creates
 one immutable `Bill Closed` event. Closing does not modify Bill Lines or
-Payments. The Customer Group remains `ACTIVE` and the Service Location remains
-occupied.
+Payments. The Customer Group remains `ACTIVE` until a separate intentional
+completion action creates one immutable `Customer Group Completed` event. A
+Customer Group without a Bill can also be completed. In either path, its Service
+Location remains occupied.
 
 **Operational Readiness:** Bill Closing is ready only for an existing
-`FULLY_PAID` Bill that is not already closed. Customer Group Completion remains
-unready because its authority, no-Bill path, and outstanding-work conditions are
-unresolved.
+`FULLY_PAID` Bill that is not already closed. Completion is ready only for an
+`ACTIVE` Customer Group whose Bill is already `CLOSED`, if a Bill exists.
 
-**Operational Confidence:** High for the confirmed Bill status and immutable
-closing event. Insufficient for Customer Group Completion or departure, which
-must not be inferred from Payment or Bill Closing.
+**Operational Confidence:** High for the confirmed Bill status, immutable
+closing event, and intentional completion outcome. Departure and location
+release remain uncertain and must not be inferred from either action.
 
 **Attention:** A zero Balance with unresolved operational work, an Active group
 after departure, or an attempted ordinary action after completion requires
 attention.
 
-**Advice:** Close only through the intentional authorized action. After closing,
-keep the Bill read-only and clearly state that service remains active and the
-location remains occupied.
+**Advice:** Close and complete only through their separate intentional actions.
+After completion, clearly state that operational service has ended while the
+location remains occupied and unavailable for another Customer Group.
 
-**Business Events:** `Bill Closed`. `Customer Group Completed` remains Command
-gated and is not produced.
+**Business Events:** `Bill Closed`; `Customer Group Completed`.
 
-**Capability Used:** Bill Closing and Billing.
+**Capability Used:** Bill Closing, Billing, and Customer Group Completion.
 
-**Expected Outcome:** The fully paid Bill becomes read-only exactly once while
-the Customer Group and Service Location remain operationally unchanged.
-
-> **MISSING CAPABILITY**
->
-> Customer Group Completion remains unavailable. Bill Closing does not resolve
-> completion, departure, or Service Location release.
+**Expected Outcome:** The fully paid Bill becomes read-only exactly once. The
+Customer Group then becomes `COMPLETED` exactly once, ending its operational
+service without changing Orders, Bill Lines, Payments, the Venue, or Service
+Location occupancy.
 
 ## 15. Guests Depart and the Service Location Is Released
 
 **Time:** 18:10
 
-**Responsible Human:** Not yet approved
+**Responsible Human:** Authorized Staff Member using the temporary development
+identity boundary for this MVP
 
-**Business Decision:** Have the guests physically departed, may the Customer
-Group complete, and may the Service Location safely become available again?
+**Business Decision:** Have the guests physically departed so the occupied
+Service Location can be released?
 
-**Current Facts:** Physical departure, Bill closing, Customer Group completion,
-location release, and any cleaning/reset requirement are separate concerns. The
-approved relationship and sequence are not defined.
+**Current Facts:** Bill closing and Customer Group completion are complete.
+Completion did not release the Service Location. Departure remains a separate
+intentional action.
 
-**Operational Readiness:** Unknown. No approved rule establishes who confirms
-departure or when the Service Location may receive the next party.
+**Operational Readiness:** Ready only when the Customer Group is `COMPLETED` and
+still occupies its Service Location.
 
-**Operational Confidence:** Insufficient. BeachOS must not show the location as
-available from an assumption that the guests have left.
+**Operational Confidence:** High after an authorized person intentionally
+confirms departure. Before that command, BeachOS keeps the location occupied.
 
-**Attention:** A new party approaching a location whose previous Customer Group
-may still be Active is an immediate operational risk.
+**Attention:** A completed Customer Group still occupying a location requires a
+departure decision. Duplicate or uncertain command outcomes require reload and
+the same request identity, not another departure fact.
 
-**Advice:** Keep uncertainty visible and prevent an unsupported claim of
-availability. Human observation cannot be silently converted into lifecycle
-completion without an approved action.
+**Advice:** Confirm departure only through the separate intentional action.
+After confirmation, explain that the Customer Group remains `COMPLETED` and the
+Service Location is immediately `AVAILABLE`.
 
-**Business Events:** No departure event is approved. `Customer Group Completed`
-and `Service Location Made Available` may be relevant only after their approved
-preconditions are satisfied.
+**Business Events:** `Guest Departed`.
 
-**Capability Used:** None defined.
+**Capability Used:** Guest Departure and Service Location Release.
 
-**Expected Outcome:** The location and Customer Group remain unresolved in the
-current product.
-
-> **MISSING CAPABILITY**
->
-> Guest Departure and Operational Release are not defined. The day cannot safely
-> recycle the Service Location or finish the guest journey.
+**Expected Outcome:** One immutable departure fact releases the occupied Service
+Location and makes it `AVAILABLE`. The completed Customer Group is not reopened,
+and Orders, Bills, and Payments remain unchanged.
 
 ## 16. Venue Ends the Operational Day
 
 **Time:** End of service
 
-**Responsible Human:** Not yet approved
+**Responsible Human:** Authorized Staff Member using the temporary development
+identity boundary for this MVP
 
 **Business Decision:** Has the Venue completed the Business Date with all live
 work, financial exceptions, and operational responsibilities accounted for?
 
-**Current Facts:** The Venue was opened for the Business Date. No official Venue
-Closing Workflow, closing authority, closing event, or Closing Report is
-approved.
+**Current Facts:** The Venue is `OPEN` for the current Business Date. Every
+Customer Group is complete, every Service Location is available, every Bill is
+closed, and every concrete Kitchen and Bar Ticket is delivered.
 
-**Operational Readiness:** Cannot be determined.
+**Operational Readiness:** Ready only when there are zero `ACTIVE` Customer
+Groups, zero occupied Service Locations, zero open Bills, and zero unresolved
+Kitchen or Bar Tickets.
 
-**Operational Confidence:** Insufficient. The absence of visible work is not
-proof that the day is safely closed.
+**Operational Confidence:** High when all four authoritative closing checks are
+zero. Any non-zero count remains an explicit blocker.
 
-**Attention:** Active Customer Groups, open Bills, uncertain Payments,
-outstanding Tickets, unresolved issues, and unclear handovers would all matter,
-but their complete closing treatment is not approved.
+**Attention:** Any active group, occupied location, unclosed Bill, or Ticket not
+yet `DELIVERED` requires action before closing.
 
-**Advice:** Do not invent an automatic day-end state or declare the Venue closed.
+**Advice:** Resolve every visible blocker, then execute the separate intentional
+closing action. If the outcome is uncertain, reload and retry with the same
+request identity.
 
-**Business Events:** None. No official Venue-closing event exists.
+**Business Events:** `Venue Closed`.
 
-**Capability Used:** None defined.
+**Capability Used:** Venue Closing.
 
-**Expected Outcome:** The operational day has no approved final Venue outcome.
-
-> **MISSING CAPABILITY**
->
-> Venue Closing is not an approved workflow or capability. Even if the guest
-> journey gaps were resolved, BeachOS could not yet close the Business Date as a
-> coherent operational day.
+**Expected Outcome:** The Venue becomes `CLOSED_FOR_BUSINESS_DATE` exactly once.
+The immutable event records Closing Time, and a permanent Closing Report records
+the four clear readiness facts and responsible actor.
 
 ---
 
@@ -716,7 +710,17 @@ The following working product slices exist in the repository:
 12. **Bill Closing MVP** — an authorized person can close one `FULLY_PAID` Bill;
     financial history becomes read-only while the Customer Group remains
     `ACTIVE` and its Service Location remains occupied.
-13. **Operational Intelligence guidance** — approved principles define readiness,
+13. **Customer Group Completion MVP** — an authorized person can intentionally
+    complete one `ACTIVE` Customer Group when its Bill is `CLOSED`, if one
+    exists; the no-Bill path is supported and the Service Location remains
+    occupied.
+14. **Guest Departure and Service Location Release MVP** — an authorized person
+    can intentionally confirm departure for one `COMPLETED` Customer Group; one
+    immutable event releases its location and makes it immediately `AVAILABLE`.
+15. **Venue Closing MVP** — an authorized person can close only the `OPEN` Venue
+    for the current Business Date after every approved blocker reaches zero; one
+    immutable event and permanent Closing Report finish the day.
+16. **Operational Intelligence guidance** — approved principles define readiness,
     confidence, attention, blockers, advice, and human decision boundaries.
 
 These are completed slices, not proof of complete operational coverage.
@@ -733,9 +737,6 @@ These are completed slices, not proof of complete operational coverage.
 6. Payment exceptions beyond the MVP, including partial, split, excess,
    multiple-method, reversal, refund, tips, and cash change.
 7. Bill correction and reversal governance.
-8. Customer Group Completion, including the no-Bill path.
-9. Guest Departure and Service Location operational release.
-10. Venue Closing for the Business Date.
 
 ## Contradictions Found
 
@@ -771,15 +772,8 @@ contradictions:
    and replacement lines combined?
 7. How do partial, split, excess, reversed, and refunded Payments work, including
    cash change, tips, and allocation?
-8. What exact conditions and authority complete a Customer Group?
-9. How does a Customer Group with no Bill complete?
-10. What is the approved sequence among physical departure, Bill closing,
-    Customer Group completion, Service Location release, and any cleaning/reset
-    requirement?
-11. What is the official Venue Closing Workflow, who owns it, and what permanent
-    closing record is required?
-12. What are the approved waiting, reservation, priority, capacity,
-    accessibility, complaint, and incident rules needed for exceptional days?
+8. What are the approved waiting, reservation, priority, capacity,
+   accessibility, complaint, and incident rules needed for exceptional days?
 
 ## Architecture Observations
 
@@ -799,23 +793,30 @@ contradictions:
    consistent.
 6. Billing now joins Beach Sunbed charges, Order obligations, the confirmed full
    Cash Payment, and immutable Bill Closing into one explainable view. Customer
-   Group completion remains a separate gap.
+   Group Completion consumes only the resulting closed/no-Bill fact and does not
+   rewrite financial history.
 7. Temporary development identity allows vertical-slice testing but cannot
    establish production Operational Confidence about human authority.
-8. The next continuity break is Customer Group Transfer: destination, charging,
-   authority, and handover rules remain incomplete.
+8. Guest Departure extends the Service Location occupancy event stream, so the
+   departure fact and immediate `AVAILABLE` state share one concurrency boundary.
+9. Venue Closing reads confirmed facts from the Customer Group, Service
+   Location, Billing, Kitchen, and Bar capabilities without taking ownership of
+   their histories.
 
 ## Final Assessment
 
 BeachOS Foundation v1.0 provides a coherent language, event catalogue, decision
 discipline, and several tested capability slices. The current business model is
-conceptually consistent but **does not yet form one executable operational
-day**.
+conceptually consistent and **forms one executable operational day**.
 
 The operational day now proceeds from Department Readiness through Venue
 Opening, Guest Arrival, Customer Group Opening, Ordering, complete basic
 whole-Ticket fulfilment through `READY`, `COLLECTED`, and `DELIVERED`,
 authoritative Bill Review, confirmed full Cash Payment, and Bill Closing. It
-still cannot continue correctly through Customer Group Transfer, Customer Group
-Completion, departure, or Venue closing. Expansion should preserve these gaps as explicit boundaries
-rather than bridge them with inferred behaviour.
+now continues through intentional Customer Group Completion, including the
+no-Bill path, Guest Departure, and immediate Service Location release. It then
+finishes the current Business Date through intentional Venue Closing, an
+immutable `Venue Closed` event, and a permanent Closing Report. Customer Group
+Transfer, handover, and other advanced paths remain outside this representative
+MVP day; they remain explicit future capability gaps rather than hidden
+assumptions.

@@ -51,10 +51,19 @@ class BillLineAdded:
     occurred_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class GuestDeparted:
+    customer_group_id: str
+    service_location_id: str
+    departed_by_id: str
+    occurred_at: datetime
+
+
 GuestArrivalEvent = (
     ResponsibleWaiterAssigned
     | CustomerGroupOpened
     | FinancialObligationCreated
     | BillCreated
     | BillLineAdded
+    | GuestDeparted
 )

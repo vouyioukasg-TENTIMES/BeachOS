@@ -5,7 +5,9 @@ import os
 from beachos_api.identity import (
     FakeBarAuthority,
     FakeBillClosingAuthority,
+    FakeCustomerGroupCompletionAuthority,
     FakeGuestArrivalAuthority,
+    FakeGuestDepartureAuthority,
     FakeIdentityProvider,
     FakeKitchenAuthority,
     FakeOrderingAuthority,
@@ -20,6 +22,12 @@ from beachos_api.packs.beachos.bill_closing.infrastructure import (
 )
 from beachos_api.packs.beachos.billing.application import BillingService
 from beachos_api.packs.beachos.billing.infrastructure import PostgresBillReader
+from beachos_api.packs.beachos.customer_completion.application import (
+    CustomerGroupCompletionService,
+)
+from beachos_api.packs.beachos.customer_completion.infrastructure import (
+    PostgresCompletionUnitOfWorkFactory,
+)
 from beachos_api.packs.beachos.guest_arrival.application import GuestArrivalService
 from beachos_api.packs.beachos.guest_arrival.infrastructure import (
     PostgresGuestArrivalUnitOfWorkFactory,
@@ -27,6 +35,10 @@ from beachos_api.packs.beachos.guest_arrival.infrastructure import (
 )
 from beachos_api.packs.beachos.guest_arrival.infrastructure import (
     UUIDIdentityGenerator as GuestArrivalUUIDIdentityGenerator,
+)
+from beachos_api.packs.beachos.guest_departure.application import GuestDepartureService
+from beachos_api.packs.beachos.guest_departure.infrastructure import (
+    PostgresDepartureUnitOfWorkFactory,
 )
 from beachos_api.packs.beachos.kitchen.application import KitchenService
 from beachos_api.packs.beachos.kitchen.infrastructure import (
@@ -41,6 +53,10 @@ from beachos_api.packs.beachos.payments.application import PaymentService
 from beachos_api.packs.beachos.payments.infrastructure import (
     PostgresPaymentUnitOfWorkFactory,
     UUIDPaymentIdentities,
+)
+from beachos_api.packs.beachos.venue_closing.application import VenueClosingService
+from beachos_api.packs.beachos.venue_closing.infrastructure import (
+    PostgresVenueClosingUnitOfWorkFactory,
 )
 from beachos_api.packs.beachos.venue_opening.application import VenueOpeningService
 from beachos_api.packs.beachos.venue_opening.domain import VenueOpeningPolicy
@@ -169,4 +185,44 @@ def bill_closing_service() -> BillClosingService:
         authority=FakeBillClosingAuthority(identities),
         clock=SystemClock(),
         units=PostgresBillClosingUnitOfWorkFactory(connection_string),
+    )
+
+
+def customer_group_completion_service() -> CustomerGroupCompletionService:
+    connection_string = os.environ.get("BEACHOS_DATABASE_URL")
+    if not connection_string:
+        raise ConfigurationError("BEACHOS_DATABASE_URL is required")
+    identities = FakeIdentityProvider()
+    return CustomerGroupCompletionService(
+        authority=FakeCustomerGroupCompletionAuthority(identities),
+        clock=SystemClock(),
+        units=PostgresCompletionUnitOfWorkFactory(connection_string),
+    )
+
+
+def guest_departure_service() -> GuestDepartureService:
+    connection_string = os.environ.get("BEACHOS_DATABASE_URL")
+    if not connection_string:
+        raise ConfigurationError("BEACHOS_DATABASE_URL is required")
+    identities = FakeIdentityProvider()
+    return GuestDepartureService(
+        authority=FakeGuestDepartureAuthority(identities),
+        clock=SystemClock(),
+        units=PostgresDepartureUnitOfWorkFactory(connection_string),
+    )
+
+
+def venue_closing_service() -> VenueClosingService:
+    connection_string = os.environ.get("BEACHOS_DATABASE_URL")
+    if not connection_string:
+        raise ConfigurationError("BEACHOS_DATABASE_URL is required")
+    identities = FakeIdentityProvider()
+    clock = SystemClock()
+    return VenueClosingService(
+        authority=FakeVenueOpeningAuthority(identities),
+        business_dates=PostgresBusinessDateProvider(
+            connection_string=connection_string, clock=clock
+        ),
+        clock=clock,
+        units=PostgresVenueClosingUnitOfWorkFactory(connection_string),
     )

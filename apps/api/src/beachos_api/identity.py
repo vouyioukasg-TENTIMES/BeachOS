@@ -30,10 +30,13 @@ class FakeIdentityProvider:
                 "ACKNOWLEDGE_KITCHEN_TICKET",
                 "COLLECT_TICKET",
                 "CLOSE_BILL",
+                "COMPLETE_CUSTOMER_GROUP",
                 "DELIVER_TICKET",
+                "DEPART_CUSTOMER_GROUP",
                 "MARK_BAR_TICKET_READY",
                 "MARK_KITCHEN_TICKET_READY",
                 "OPEN_VENUE",
+                "CLOSE_VENUE",
                 "RECORD_PAYMENTS",
                 "SUBMIT_ORDER",
             }
@@ -97,6 +100,15 @@ class FakeVenueOpeningAuthority:
             and "OPEN_VENUE" in identity.capabilities
         )
 
+    def can_close_venue(self, *, actor_id: str, venue_id: str) -> bool:
+        del venue_id
+        identity = self._identities.current()
+        return (
+            actor_id == identity.actor_id
+            and identity.has_venue_access
+            and "CLOSE_VENUE" in identity.capabilities
+        )
+
     def is_responsible_host(self, *, actor_id: str, venue_id: str) -> bool:
         del venue_id
         identity = self._identities.current()
@@ -144,6 +156,34 @@ class FakeBillClosingAuthority:
             actor_id == identity.actor_id
             and identity.has_venue_access
             and "CLOSE_BILL" in identity.capabilities
+        )
+
+
+class FakeCustomerGroupCompletionAuthority:
+    def __init__(self, identities: FakeIdentityProvider) -> None:
+        self._identities = identities
+
+    def can_complete_customer_group(self, *, actor_id: str, customer_group_id: str) -> bool:
+        del customer_group_id
+        identity = self._identities.current()
+        return (
+            actor_id == identity.actor_id
+            and identity.has_venue_access
+            and "COMPLETE_CUSTOMER_GROUP" in identity.capabilities
+        )
+
+
+class FakeGuestDepartureAuthority:
+    def __init__(self, identities: FakeIdentityProvider) -> None:
+        self._identities = identities
+
+    def can_depart_customer_group(self, *, actor_id: str, customer_group_id: str) -> bool:
+        del customer_group_id
+        identity = self._identities.current()
+        return (
+            actor_id == identity.actor_id
+            and identity.has_venue_access
+            and "DEPART_CUSTOMER_GROUP" in identity.capabilities
         )
 
 

@@ -15,10 +15,13 @@ from beachos_api.composition import (
     bar_service,
     bill_closing_service,
     billing_service,
+    customer_group_completion_service,
     guest_arrival_service,
+    guest_departure_service,
     kitchen_service,
     ordering_service,
     payment_service,
+    venue_closing_service,
     venue_opening_service,
 )
 from beachos_api.identity import DevelopmentIdentity, development_identity
@@ -53,6 +56,20 @@ from beachos_api.packs.beachos.bill_closing.application.service import (
 from beachos_api.packs.beachos.bill_closing.infrastructure import BillClosingConcurrencyError
 from beachos_api.packs.beachos.billing.application import BillDTO as RunningBillDTO
 from beachos_api.packs.beachos.billing.application import BillingService
+from beachos_api.packs.beachos.customer_completion.application import (
+    CompleteCustomerGroupCommand,
+    CompleteCustomerGroupResult,
+    CompletionContextResult,
+    CustomerGroupCompletionService,
+)
+from beachos_api.packs.beachos.customer_completion.application.service import (
+    CompletionApplicationError,
+    CompletionAuthorizationError,
+    CompletionNotFoundError,
+)
+from beachos_api.packs.beachos.customer_completion.infrastructure import (
+    CompletionConcurrencyError,
+)
 from beachos_api.packs.beachos.guest_arrival.application import (
     GuestArrivalContextResult,
     GuestArrivalService,
@@ -69,6 +86,18 @@ from beachos_api.packs.beachos.guest_arrival.application.exceptions import (
 from beachos_api.packs.beachos.guest_arrival.infrastructure.errors import (
     GuestArrivalConcurrencyError,
     GuestArrivalInfrastructureError,
+)
+from beachos_api.packs.beachos.guest_departure.application import (
+    DepartCustomerGroupCommand,
+    DepartureApplicationError,
+    DepartureAuthorizationError,
+    DepartureContextResult,
+    DepartureNotFoundError,
+    DepartureResult,
+    GuestDepartureService,
+)
+from beachos_api.packs.beachos.guest_departure.infrastructure import (
+    DepartureConcurrencyError,
 )
 from beachos_api.packs.beachos.kitchen.application import (
     AcknowledgeKitchenTicketCommand,
@@ -117,6 +146,19 @@ from beachos_api.packs.beachos.payments.application.service import (
     PaymentNotFoundError,
 )
 from beachos_api.packs.beachos.payments.infrastructure.persistence import PaymentConcurrencyError
+from beachos_api.packs.beachos.venue_closing.application import (
+    CloseVenueCommand,
+    CloseVenueResult,
+    ClosingContextResult,
+    ClosingReportDTO,
+    VenueClosingApplicationError,
+    VenueClosingAuthorizationError,
+    VenueClosingNotFoundError,
+    VenueClosingService,
+)
+from beachos_api.packs.beachos.venue_closing.infrastructure import (
+    VenueClosingConcurrencyError,
+)
 from beachos_api.packs.beachos.venue_opening.application import (
     DeclareDepartmentReadinessCommand,
     DeclareDepartmentReadinessResult,
@@ -152,6 +194,12 @@ class OpenVenueRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
+    request_id: str = Field(min_length=1)
+    venue_id: str = Field(min_length=1)
+
+
+class CloseVenueRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     request_id: str = Field(min_length=1)
     venue_id: str = Field(min_length=1)
 
@@ -323,6 +371,73 @@ class OpenVenueResponse(BaseModel):
         )
 
 
+class ClosingReportResponse(BaseModel):
+    venue_id: str
+    business_date: date
+    closed_at: datetime
+    closed_by_id: str
+    active_customer_groups: int
+    occupied_service_locations: int
+    open_bills: int
+    unresolved_operational_work: int
+
+    @classmethod
+    def from_application(cls, report: ClosingReportDTO) -> ClosingReportResponse:
+        return cls(**{field: getattr(report, field) for field in cls.model_fields})
+
+
+class ClosingReadinessResponse(BaseModel):
+    active_customer_groups: int
+    occupied_service_locations: int
+    open_bills: int
+    unresolved_operational_work: int
+
+
+class ClosingContextResponse(BaseModel):
+    venue_id: str
+    business_date: date
+    status: str
+    readiness: ClosingReadinessResponse
+    blockers: list[str]
+    can_close: bool
+    closing_report: ClosingReportResponse | None
+
+    @classmethod
+    def from_application(cls, result: ClosingContextResult) -> ClosingContextResponse:
+        return cls(
+            venue_id=result.venue_id,
+            business_date=result.business_date,
+            status=result.status,
+            readiness=ClosingReadinessResponse(
+                active_customer_groups=result.readiness.active_customer_groups,
+                occupied_service_locations=result.readiness.occupied_service_locations,
+                open_bills=result.readiness.open_bills,
+                unresolved_operational_work=result.readiness.unresolved_operational_work,
+            ),
+            blockers=list(result.blockers),
+            can_close=result.can_close,
+            closing_report=(
+                ClosingReportResponse.from_application(result.closing_report)
+                if result.closing_report
+                else None
+            ),
+        )
+
+
+class CloseVenueResponse(BaseModel):
+    request_id: str
+    status: str
+    closing_report: ClosingReportResponse
+
+    @classmethod
+    def from_application(cls, result: CloseVenueResult) -> CloseVenueResponse:
+        return cls(
+            request_id=result.request_id,
+            status=result.status,
+            closing_report=ClosingReportResponse.from_application(result.closing_report),
+        )
+
+
 class DepartmentContextResponse(BaseModel):
     department_id: str
     name: str
@@ -446,6 +561,11 @@ VenueId = Annotated[str, Query(min_length=1)]
 OrderingServiceDependency = Annotated[OrderingService, Depends(ordering_service)]
 BillingServiceDependency = Annotated[BillingService, Depends(billing_service)]
 BillClosingServiceDependency = Annotated[BillClosingService, Depends(bill_closing_service)]
+CompletionServiceDependency = Annotated[
+    CustomerGroupCompletionService, Depends(customer_group_completion_service)
+]
+DepartureServiceDependency = Annotated[GuestDepartureService, Depends(guest_departure_service)]
+VenueClosingServiceDependency = Annotated[VenueClosingService, Depends(venue_closing_service)]
 PaymentServiceDependency = Annotated[PaymentService, Depends(payment_service)]
 GuestArrivalServiceDependency = Annotated[GuestArrivalService, Depends(guest_arrival_service)]
 CustomerGroupId = Annotated[str, Query(min_length=1)]
@@ -824,6 +944,27 @@ def open_venue(
     return OpenVenueResponse.from_application(result)
 
 
+@router.get("/venue/closing-context", response_model=ClosingContextResponse)
+def venue_closing_context(
+    venue_id: VenueId,
+    service: VenueClosingServiceDependency,
+    identity: Identity,
+) -> ClosingContextResponse:
+    del identity
+    return ClosingContextResponse.from_application(service.get_context(venue_id=venue_id))
+
+
+@router.post("/venue/close", response_model=CloseVenueResponse)
+def close_venue(
+    payload: CloseVenueRequest,
+    service: VenueClosingServiceDependency,
+    identity: Identity,
+) -> CloseVenueResponse:
+    return CloseVenueResponse.from_application(
+        service.close(CloseVenueCommand(payload.request_id, identity.actor_id, payload.venue_id))
+    )
+
+
 @router.get(
     "/venue/department-readiness/context",
     response_model=DepartmentOwnerContextResponse,
@@ -971,6 +1112,74 @@ class CloseBillResponse(BaseModel):
         return cls(**{field: getattr(result, field) for field in cls.model_fields})
 
 
+class CompletionContextResponse(BaseModel):
+    customer_group_id: str
+    status: str
+    bill_status: str | None
+    can_complete: bool
+    next_action: str
+    service_location_status: str
+
+    @classmethod
+    def from_application(cls, result: CompletionContextResult) -> CompletionContextResponse:
+        return cls(**{field: getattr(result, field) for field in cls.model_fields})
+
+
+class CompleteCustomerGroupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    request_id: str = Field(min_length=1)
+
+
+class CompleteCustomerGroupResponse(BaseModel):
+    request_id: str
+    customer_group_id: str
+    status: str
+    completed_by_id: str
+    completed_at: datetime
+    service_location_status: str
+    service_location_released: bool
+
+    @classmethod
+    def from_application(cls, result: CompleteCustomerGroupResult) -> CompleteCustomerGroupResponse:
+        return cls(**{field: getattr(result, field) for field in cls.model_fields})
+
+
+class DepartureContextResponse(BaseModel):
+    customer_group_id: str
+    customer_group_status: str
+    departure_status: str
+    service_location_id: str
+    service_location_name: str
+    service_location_status: str
+    can_depart: bool
+    next_action: str
+
+    @classmethod
+    def from_application(cls, result: DepartureContextResult) -> DepartureContextResponse:
+        return cls(**{field: getattr(result, field) for field in cls.model_fields})
+
+
+class DepartCustomerGroupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    request_id: str = Field(min_length=1)
+
+
+class DepartureResponse(BaseModel):
+    request_id: str
+    customer_group_id: str
+    customer_group_status: str
+    departure_status: str
+    service_location_id: str
+    service_location_name: str
+    service_location_status: str
+    departed_by_id: str
+    departed_at: datetime
+
+    @classmethod
+    def from_application(cls, result: DepartureResult) -> DepartureResponse:
+        return cls(**{field: getattr(result, field) for field in cls.model_fields})
+
+
 class RecordCashPaymentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     request_id: str = Field(min_length=1)
@@ -1019,6 +1228,70 @@ def close_bill(
     return CloseBillResponse.from_application(
         service.close_bill(
             CloseBillCommand(payload.request_id, identity.actor_id, payload.customer_group_id)
+        )
+    )
+
+
+@router.get(
+    "/customer-groups/{customer_group_id}/completion",
+    response_model=CompletionContextResponse,
+)
+def completion_context(
+    customer_group_id: str,
+    service: CompletionServiceDependency,
+    identity: Identity,
+) -> CompletionContextResponse:
+    del identity
+    return CompletionContextResponse.from_application(
+        service.get_context(customer_group_id=customer_group_id)
+    )
+
+
+@router.post(
+    "/customer-groups/{customer_group_id}/complete",
+    response_model=CompleteCustomerGroupResponse,
+)
+def complete_customer_group(
+    customer_group_id: str,
+    payload: CompleteCustomerGroupRequest,
+    service: CompletionServiceDependency,
+    identity: Identity,
+) -> CompleteCustomerGroupResponse:
+    return CompleteCustomerGroupResponse.from_application(
+        service.complete(
+            CompleteCustomerGroupCommand(payload.request_id, identity.actor_id, customer_group_id)
+        )
+    )
+
+
+@router.get(
+    "/customer-groups/{customer_group_id}/departure",
+    response_model=DepartureContextResponse,
+)
+def departure_context(
+    customer_group_id: str,
+    service: DepartureServiceDependency,
+    identity: Identity,
+) -> DepartureContextResponse:
+    del identity
+    return DepartureContextResponse.from_application(
+        service.get_context(customer_group_id=customer_group_id)
+    )
+
+
+@router.post(
+    "/customer-groups/{customer_group_id}/depart",
+    response_model=DepartureResponse,
+)
+def depart_customer_group(
+    customer_group_id: str,
+    payload: DepartCustomerGroupRequest,
+    service: DepartureServiceDependency,
+    identity: Identity,
+) -> DepartureResponse:
+    return DepartureResponse.from_application(
+        service.depart(
+            DepartCustomerGroupCommand(payload.request_id, identity.actor_id, customer_group_id)
         )
     )
 
@@ -1348,3 +1621,51 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(BillClosingApplicationError)
     def bill_closing_rejected(_: Request, error: BillClosingApplicationError) -> JSONResponse:
         return _error(409, "bill_closing_rejected", str(error))
+
+    @app.exception_handler(CompletionAuthorizationError)
+    def completion_denied(_: Request, error: CompletionAuthorizationError) -> JSONResponse:
+        return _error(403, "completion_forbidden", str(error))
+
+    @app.exception_handler(CompletionNotFoundError)
+    def completion_missing(_: Request, error: CompletionNotFoundError) -> JSONResponse:
+        return _error(404, "customer_group_not_found", str(error))
+
+    @app.exception_handler(CompletionConcurrencyError)
+    def completion_conflict(_: Request, __: CompletionConcurrencyError) -> JSONResponse:
+        return _error(409, "completion_conflict", "Customer Group changed. Reload its state.")
+
+    @app.exception_handler(CompletionApplicationError)
+    def completion_rejected(_: Request, error: CompletionApplicationError) -> JSONResponse:
+        return _error(409, "completion_rejected", str(error))
+
+    @app.exception_handler(DepartureAuthorizationError)
+    def departure_denied(_: Request, error: DepartureAuthorizationError) -> JSONResponse:
+        return _error(403, "departure_forbidden", str(error))
+
+    @app.exception_handler(DepartureNotFoundError)
+    def departure_missing(_: Request, error: DepartureNotFoundError) -> JSONResponse:
+        return _error(404, "departure_context_not_found", str(error))
+
+    @app.exception_handler(DepartureConcurrencyError)
+    def departure_conflict(_: Request, __: DepartureConcurrencyError) -> JSONResponse:
+        return _error(409, "departure_conflict", "Departure state changed. Reload its context.")
+
+    @app.exception_handler(DepartureApplicationError)
+    def departure_rejected(_: Request, error: DepartureApplicationError) -> JSONResponse:
+        return _error(409, "departure_rejected", str(error))
+
+    @app.exception_handler(VenueClosingAuthorizationError)
+    def venue_closing_denied(_: Request, error: VenueClosingAuthorizationError) -> JSONResponse:
+        return _error(403, "venue_closing_forbidden", str(error))
+
+    @app.exception_handler(VenueClosingNotFoundError)
+    def venue_closing_missing(_: Request, error: VenueClosingNotFoundError) -> JSONResponse:
+        return _error(404, "venue_closing_context_not_found", str(error))
+
+    @app.exception_handler(VenueClosingConcurrencyError)
+    def venue_closing_conflict(_: Request, __: VenueClosingConcurrencyError) -> JSONResponse:
+        return _error(409, "venue_closing_conflict", "Venue Closing state changed. Reload.")
+
+    @app.exception_handler(VenueClosingApplicationError)
+    def venue_closing_rejected(_: Request, error: VenueClosingApplicationError) -> JSONResponse:
+        return _error(409, "venue_closing_rejected", str(error))

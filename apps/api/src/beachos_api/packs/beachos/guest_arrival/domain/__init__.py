@@ -6,6 +6,7 @@ from beachos_api.packs.beachos.guest_arrival.domain.events import (
     CustomerGroupOpened,
     FinancialObligationCreated,
     GuestArrivalEvent,
+    GuestDeparted,
     ResponsibleWaiterAssigned,
 )
 from beachos_api.packs.beachos.guest_arrival.domain.model import (
@@ -25,6 +26,7 @@ __all__ = [
     "FinancialObligationCreated",
     "GuestArrivalError",
     "GuestArrivalEvent",
+    "GuestDeparted",
     "Money",
     "ResponsibleWaiterAssigned",
     "ServiceLocation",

@@ -23,9 +23,9 @@ def _required(value: str, field: str) -> str:
     return normalized
 
 
-def _aware(value: datetime) -> datetime:
+def _aware(value: datetime, action: str = "opening") -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
-        raise GuestArrivalError("opening time must include a timezone")
+        raise GuestArrivalError(f"{action} time must include a timezone")
     return value
 
 
@@ -230,10 +230,30 @@ class ServiceLocation:
                     moment,
                 )
             )
-        group = self._active_customer_group
+        group = self.active_customer_group
         if group is None:
             raise GuestArrivalError("Customer Group opening did not complete")
         return group
+
+    def depart_customer_group(
+        self,
+        *,
+        customer_group_id: str,
+        departed_by_id: str,
+        departed_at: datetime,
+        customer_group_is_completed: bool,
+    ) -> None:
+        from beachos_api.packs.beachos.guest_arrival.domain.events import GuestDeparted
+
+        group_id = _required(customer_group_id, "Customer Group id")
+        actor_id = _required(departed_by_id, "departure actor id")
+        moment = _aware(departed_at, "departure")
+        group = self._active_customer_group
+        if group is None or group.customer_group_id != group_id:
+            raise GuestArrivalError("the Customer Group does not occupy this Service Location")
+        if not customer_group_is_completed:
+            raise GuestArrivalError("only a COMPLETED Customer Group may depart")
+        self._record(GuestDeparted(group_id, self._service_location_id, actor_id, moment))
 
     def _record(self, event: GuestArrivalEvent) -> None:
         self._apply(event)
@@ -246,6 +266,7 @@ class ServiceLocation:
             BillCreated,
             CustomerGroupOpened,
             FinancialObligationCreated,
+            GuestDeparted,
             ResponsibleWaiterAssigned,
         )
 
@@ -290,6 +311,14 @@ class ServiceLocation:
                 group.bill_id,
                 Money(event.amount, event.currency),
             )
+        elif isinstance(event, GuestDeparted):
+            group = self._active_customer_group
+            if event.service_location_id != self._service_location_id:
+                raise GuestArrivalError("departure event belongs to another Service Location")
+            if group is None or group.customer_group_id != event.customer_group_id:
+                raise GuestArrivalError("departure must match the occupying Customer Group")
+            self._active_customer_group = None
+            self._status = ServiceLocationStatus.AVAILABLE
 
     def pull_events(self) -> tuple[GuestArrivalEvent, ...]:
         events = tuple(self._pending)

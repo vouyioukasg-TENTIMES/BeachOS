@@ -56,6 +56,7 @@ class OpeningStatus(StrEnum):
 
     CLOSED = "CLOSED"
     OPEN = "OPEN"
+    CLOSED_FOR_BUSINESS_DATE = "CLOSED_FOR_BUSINESS_DATE"
 
 
 class ReadinessStatus(StrEnum):
@@ -287,8 +288,10 @@ class VenueOpeningPolicy:
         host_is_responsible: bool,
         host_has_required_capability: bool,
     ) -> None:
-        if opening_status is OpeningStatus.OPEN:
-            raise VenueOpeningError("the Venue is already open for this Business Date")
+        if opening_status is not OpeningStatus.CLOSED:
+            if opening_status is OpeningStatus.OPEN:
+                raise VenueOpeningError("the Venue is already open for this Business Date")
+            raise VenueOpeningError("the Venue is already closed for this Business Date")
         if not checklist.departments:
             raise VenueOpeningError("at least one mandatory department is required")
         if checklist.missing_department_ids:
@@ -338,6 +341,7 @@ class Venue:
         opening_status: OpeningStatus,
         opening_report: OpeningReport | None,
         aggregate_version: int,
+        closing_report_exists: bool = False,
     ) -> Venue:
         """Reconstruct authoritative state without performing a business action."""
 
@@ -362,7 +366,7 @@ class Venue:
         )
 
         expected_version = len(declaration_history)
-        if opening_status is OpeningStatus.OPEN:
+        if opening_status is not OpeningStatus.CLOSED:
             expected_version += 1
             if opening_report is None:
                 raise VenueOpeningError("an open restored Venue requires an Opening Report")
@@ -379,8 +383,16 @@ class Venue:
                 raise VenueOpeningError(
                     "restored Opening Report must match current department readiness"
                 )
+            if opening_status is OpeningStatus.CLOSED_FOR_BUSINESS_DATE:
+                if not closing_report_exists:
+                    raise VenueOpeningError(
+                        "a closed Business Date requires a permanent Closing Report"
+                    )
+                expected_version += 1
         elif opening_report is not None:
             raise VenueOpeningError("a closed restored Venue cannot have an Opening Report")
+        elif closing_report_exists:
+            raise VenueOpeningError("an unopened Venue cannot have a Closing Report")
 
         if aggregate_version != expected_version:
             raise VenueOpeningError(
@@ -437,7 +449,7 @@ class Venue:
         reason: str | None = None,
         comment: str | None = None,
     ) -> DepartmentReadiness:
-        if self._opening_status is OpeningStatus.OPEN:
+        if self._opening_status is not OpeningStatus.CLOSED:
             raise VenueOpeningError("opening readiness cannot be changed after the Venue is open")
 
         declaration = self._opening_checklist.declare(

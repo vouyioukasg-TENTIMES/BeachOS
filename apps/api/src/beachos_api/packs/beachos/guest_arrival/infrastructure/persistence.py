@@ -18,13 +18,20 @@ from beachos_api.packs.beachos.guest_arrival.application.dtos import (
     OpenCustomerGroupResult,
     ServiceLocationDTO,
 )
-from beachos_api.packs.beachos.guest_arrival.application.ports import GuestArrivalUnitOfWork
+from beachos_api.packs.beachos.guest_arrival.application.ports import (
+    ActivityLog,
+    CommandReceiptStore,
+    GuestArrivalUnitOfWork,
+    OrderingProvisioner,
+    ServiceLocationRepository,
+)
 from beachos_api.packs.beachos.guest_arrival.domain import (
     BillCreated,
     BillLineAdded,
     CustomerGroupOpened,
     FinancialObligationCreated,
     GuestArrivalEvent,
+    GuestDeparted,
     Money,
     ResponsibleWaiterAssigned,
     ServiceLocation,
@@ -93,6 +100,16 @@ def _event_to_data(event: GuestArrivalEvent) -> tuple[str, dict[str, Any], datet
             },
             event.occurred_at,
         )
+    if isinstance(event, GuestDeparted):
+        return (
+            "GUEST_DEPARTED",
+            {
+                "customer_group_id": event.customer_group_id,
+                "service_location_id": event.service_location_id,
+                "departed_by_id": event.departed_by_id,
+            },
+            event.occurred_at,
+        )
     raise ValueError("unsupported Guest Arrival event")
 
 
@@ -131,6 +148,13 @@ def _event_from_data(kind: str, data: dict[str, Any], at: datetime) -> GuestArri
             Decimal(data["amount"]),
             data["currency"],
             data["source"],
+            at,
+        )
+    if kind == "GUEST_DEPARTED":
+        return GuestDeparted(
+            data["customer_group_id"],
+            data["service_location_id"],
+            data["departed_by_id"],
             at,
         )
     raise ValueError(f"unsupported Guest Arrival event type: {kind}")
@@ -188,6 +212,17 @@ class PostgresServiceLocationRepository:
         row = self._connection.execute(
             "SELECT * FROM guest_arrival_service_locations WHERE service_location_id=%s",
             (service_location_id,),
+        ).fetchone()
+        return self._from_row(row) if row else None
+
+    def get_for_customer_group(self, *, customer_group_id: str) -> ServiceLocation | None:
+        row = self._connection.execute(
+            """SELECT location.* FROM guest_arrival_service_locations AS location
+            JOIN guest_arrival_events AS event
+              ON event.service_location_id=location.service_location_id
+            WHERE event.event_type='CUSTOMER_GROUP_OPENED'
+              AND event.event_data->>'customer_group_id'=%s""",
+            (customer_group_id,),
         ).fetchone()
         return self._from_row(row) if row else None
 
@@ -420,34 +455,34 @@ class PostgresGuestArrivalUnitOfWork:
                 self._connection.rollback()
             self._connection.close()
 
-    def _conn(self):
+    def _conn(self) -> psycopg.Connection[dict[str, Any]]:
         if self._connection is None:
             raise RuntimeError("unit of work has not been entered")
         return self._connection
 
     @property
-    def locations(self):
+    def locations(self) -> ServiceLocationRepository:
         self._conn()
         if self._locations is None:
             raise RuntimeError("unit of work has not been entered")
         return self._locations
 
     @property
-    def receipts(self):
+    def receipts(self) -> CommandReceiptStore:
         self._conn()
         if self._receipts is None:
             raise RuntimeError("unit of work has not been entered")
         return self._receipts
 
     @property
-    def ordering(self):
+    def ordering(self) -> OrderingProvisioner:
         self._conn()
         if self._ordering is None:
             raise RuntimeError("unit of work has not been entered")
         return self._ordering
 
     @property
-    def activity_log(self):
+    def activity_log(self) -> ActivityLog:
         self._conn()
         if self._activity is None:
             raise RuntimeError("unit of work has not been entered")

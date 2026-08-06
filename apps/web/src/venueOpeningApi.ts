@@ -42,7 +42,7 @@ export interface VenueContext {
   venue_id: string;
   venue_name: string;
   business_date: string;
-  opening_status: 'CLOSED' | 'OPEN';
+  opening_status: 'CLOSED' | 'OPEN' | 'CLOSED_FOR_BUSINESS_DATE';
   opening_report: OpeningReport | null;
   department_readiness: DepartmentContext[];
   outstanding_departments: string[];
