@@ -18,8 +18,8 @@ Install these tools before continuing:
 5. **Python 3.13** — runs the backend. Python 3.12 or earlier is not supported.
 6. **uv 0.8 or newer** — installs and runs the Python environment.
 7. **Docker Desktop with Docker Compose v2** — runs PostgreSQL 17 locally.
-8. **curl** — checks that the backend started. It is already included with macOS and
-   most Linux systems.
+8. **curl and nc** — check that the expected ports and backend are available. Both are
+   already included with macOS and most Linux systems.
 
 Docker Desktop must be open and show that its engine is running.
 
@@ -132,7 +132,7 @@ Expected response:
 ### Terminal 3 — Frontend
 
 ```sh
-corepack pnpm@10.12.4 --filter @beachos/web dev --host 127.0.0.1
+corepack pnpm@10.12.4 --filter @beachos/web dev --host 127.0.0.1 --strictPort
 ```
 
 The Frontend is successful when the terminal includes text similar to:

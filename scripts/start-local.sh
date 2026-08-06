@@ -16,7 +16,7 @@ if [ ! -f "$environment_file" ]; then
   exit 1
 fi
 
-for required_tool in docker node uv curl; do
+for required_tool in docker node uv curl nc; do
   if ! command -v "$required_tool" >/dev/null 2>&1; then
     echo "Missing required tool: $required_tool. See START_HERE.md." >&2
     exit 1
@@ -31,6 +31,13 @@ else
   echo "Missing required tool: pnpm or Corepack. See START_HERE.md." >&2
   exit 1
 fi
+
+for application_port in 8000 5173; do
+  if nc -z 127.0.0.1 "$application_port" >/dev/null 2>&1; then
+    echo "Port $application_port is already in use. Stop the existing BeachOS process first." >&2
+    exit 1
+  fi
+done
 
 set -a
 # This file is local, user-controlled configuration copied from .env.example.
@@ -98,7 +105,7 @@ done
 echo "Starting BeachOS Frontend…"
 (
   cd "$repository_root"
-  run_pnpm --filter @beachos/web dev --host 127.0.0.1
+  run_pnpm --filter @beachos/web dev --host 127.0.0.1 --strictPort
 ) &
 web_pid=$!
 

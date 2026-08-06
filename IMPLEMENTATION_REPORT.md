@@ -33,7 +33,7 @@
 - `infrastructure/docker/compose.yaml` — allowed the localhost-only PostgreSQL port to
   be published while retaining the `127.0.0.1` binding.
 - `scripts/start-local.sh` — added Homebrew discovery, Corepack pnpm fallback, correct
-  backend source path, and idempotent local configuration.
+  backend source path, idempotent local configuration, and exact-port preflight.
 - `scripts/check-environment.sh` — discovers Homebrew and checks Python 3.13 explicitly.
 - `scripts/README.md` — documented executable local helpers.
 - `START_HERE.md` — corrected exact pnpm, backend, and local configuration commands.
